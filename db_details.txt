@@ -1,0 +1,1 @@
+mongod --dbpath=./local_database --port 27017

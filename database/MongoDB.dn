@@ -1,0 +1,44 @@
+component provides MongoDB requires io.Output out, data.json.JSONParser parser, net.TCPSocket client{
+
+  char HOSTIP = "";
+	int HOSTPORT = 0;
+
+  MongoDB:MongoDB(char ip[], int port){
+    HOSTIP = ip;
+    HOSTPORT = port;
+  }
+
+  JSONElement MongoDB:insert(JSONElement jsonQuery){
+    if (client.connect(HOSTIP, HOSTPORT)) {
+      //client.send();
+      client.disconnect();
+    }
+    return jsonQuery;
+  }
+
+  JSONElement MongoDB:find(JSONElement jsonQuery){
+    return jsonQuery;
+  }
+
+  JSONElement MongoDB:findAndSort(JSONElement jsonQuery, JSONElement modifier){
+    return jsonQuery;
+  }
+
+  JSONElement MongoDB:update(JSONElement jsonQuery){
+    return jsonQuery;
+  }
+
+  JSONElement MongoDB:delete(JSONElement jsonQuery){
+    return jsonQuery;
+  }
+
+  byte[] serialiseMongoQuery(){
+    byte serialised[];
+    return serialised;
+  }
+
+  byte[] serialiseMongoQueryRF(){
+    byte serialised[];
+    return serialised;
+  }
+}

@@ -1,0 +1,10 @@
+component provides App requires io.Output out, database.MongoDB{
+
+	int App:main(AppParam params[]) {
+
+    MongoDB mongo = new MongoDB("127.0.0.1",27017);
+
+
+		return 0;
+	}
+}

@@ -1,0 +1,26 @@
+int BSON_DOUBLE = 1;            //| "\x01" e_name double	64-bit binary floating point
+int BSON_UTF8 = 2;              //| "\x02" e_name string	UTF-8 string
+int BSON_EMBEDDED_DOCUMENT = 3; //| "\x03" e_name document	Embedded document
+int BSON_ARRAY = 4;             //|	"\x04" e_name document	Array
+int BSON_BINARY = 5;            //|	"\x05" e_name binary	Binary data
+int BSON_UNDEFINED = 6;         //|	"\x06" e_name	Undefined (value) — Deprecated
+int BSON_OBJECT_ID = 7;         //|	"\x07" e_name (byte*12)	ObjectId
+int BSON_BOOL = 8;              //|	"\x08" e_name "\x00"	Boolean "false //|	"\x08" e_name "\x01"	Boolean "true"
+int BSON_DATE_TIME = 9;         //|	"\x09" e_name int64	UTC datetime
+int BSON_NULL = 10;             //|	"\x0A" e_name	Null value
+int BSON_REGEX = 11;            //|	"\x0B" e_name cstring cstring	Regular expression - The first cstring is the regex pattern, the second is the regex options string. Options are identified by characters, which must be stored in alphabetical order. Valid options are 'i' for case insensitive matching, 'm' for multiline matching, 'x' for verbose mode, 'l' to make \w, \W, etc. locale dependent, 's' for dotall mode ('.' matches everything), and 'u' to make \w, \W, etc. match unicode.
+int BSON_STRING = 12;           //|	"\x0C" e_name string (byte*12)	DBPointer — Deprecated
+int BSON_INT_32 = 16;           //|	"\x10" e_name int32	32-bit integer
+int BSON_INT_64_TIMESTAMP = 17; //|	"\x11" e_name int64	Timestamp
+int BSON_INT_64 = 18;           //|	"\x12" e_name int64	64-bit integer
+
+uses data.json.JSONParser;
+
+data BSONDocument{
+  char value[];
+}
+
+interface BSON {
+  BSONDocument serialise(JSONElement json);
+  JSONElement deserialise(BSONDocument bson);
+}

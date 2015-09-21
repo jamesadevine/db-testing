@@ -1,0 +1,79 @@
+const byte JSON_ELEMENT_OBJECT	= 1;
+const byte JSON_ELEMENT_STRING	= 2;
+const byte JSON_ELEMENT_NUMBER	= 3;
+const byte JSON_ELEMENT_BOOLEAN	= 4;
+const byte JSON_ELEMENT_ARRAY	= 5;
+
+uses data.json.JSONParser;
+
+component provides BSON requires io.Output out{
+
+  BSONDocument BSON:serialise(JSONElement json){
+    BSONDocument bson;
+    digestJSONElement(json,bson);
+    return bson;
+  }
+
+  JSONElement BSON:deserialise(BSONDocument bson){
+    JSONElement e;
+    return e;
+  }
+
+  void digestJSONElement(JSONElement element, BSONDocument bson){
+
+    if(element.type == JSON_ELEMENT_OBJECT){
+      serialiseName(element.name, bson);
+      serialiseObject(element.value, bson);
+    }
+
+    if(element.type == JSON_ELEMENT_STRING){
+      serialiseName(element.name, bson);
+      serialiseString(element.value, bson);
+    }
+
+    if(element.type == JSON_ELEMENT_NUMBER){
+      serialiseName(element.name, bson);
+      serialiseNumber(element.value, bson);
+    }
+
+    if(element.type == JSON_ELEMENT_BOOLEAN){
+      serialiseName(element.name, bson);
+      serialiseBoolean(element.value, bson);
+    }
+
+    if(element.type == JSON_ELEMENT_ARRAY){
+      serialiseName(element.name, bson);
+      serialiseArray(element.value, bson);
+    }
+
+
+    for(int i = 0; i < element.children.arrayLength; i++){
+      digestJSONElement(element.children[i],bson);
+    }
+  }
+
+  void serialiseName(char value[], BSONDocument bson){
+
+  }
+
+  void serialiseObject(char value[], BSONDocument bson){
+
+  }
+
+  void serialiseString(char value[], BSONDocument bson){
+
+  }
+
+  void serialiseNumber(char value[], BSONDocument bson){
+
+  }
+
+  void serialiseBoolean(char value[], BSONDocument bson){
+
+  }
+
+  void serialiseArray(char value[], BSONDocument bson){
+
+  }
+
+}
