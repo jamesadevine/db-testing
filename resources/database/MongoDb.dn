@@ -1,16 +1,22 @@
 
-int32 OP_REPLY = 1;              //returned by the database
-int32 OP_MSG = 1000;            // generic msg command
-int32 OP_UPDATE = 2001;         // update document
-int32 OP_INSERT = 2002;         // insert new document
-int32 OP_QUERY = 2004;          // query a collection
-int32 OP_GET_MORE = 2005;       // get more data from a query
-int32 OP_DELETE = 2006;         // delete documents
-int32 OP_KILL_CURSORS = 2007;   // tell db we are finished with a cursor.
+const int32 OP_REPLY = 1;             //returned by the database
+const int32 OP_MSG = 1000;            // generic msg command
+const int32 OP_UPDATE = 2001;         // update document
+const int32 OP_INSERT = 2002;         // insert new document
+const int32 OP_QUERY = 2004;          // query a collection
+const int32 OP_GET_MORE = 2005;       // get more data from a query
+const int32 OP_DELETE = 2006;         // delete documents
+const int32 OP_KILL_CURSORS = 2007;   // tell db we are finished with a cursor.
+
+const int32 MONGO_HEADER_SIZE = 16;   //16 bytes
+
+const int32 MONGO_MAX_RAND = 65535;
+
+const int32 MONGO_TIMEOUT_VALUE = 1000;
 
 uses database.BSON;
 
-data MongoMessage{
+data MongoHeader{
   int32   messageLength; // total message size, including this
   int32   requestID;     // identifier for this message
   int32   responseTo;    // requestID from the original request
@@ -37,7 +43,7 @@ data MongoMessage{
   There is no response to an OP_UPDATE message.
 */
 data MongoUpdate{
-    MongoMessage header;             // standard message header
+    MongoHeader header;             // standard message header
     int32     ZERO;               // 0 - reserved for future use
     char   fullCollectionName[]; // "dbname.collectionname"
     int32     flags;              // bit vector. see below
@@ -60,10 +66,10 @@ data MongoUpdate{
   There is no response to an OP_INSERT message.
 */
 data MongoInsert{
-    MongoMessage header;             // standard message header
+    MongoHeader header;             // standard message header
     int32     flags;              // bit vector - see below
     char   fullCollectionName[]; // "dbname.collectionname"
-    BSONDocument documents[];          // one or more documents to insert into the collection
+    BSONDocument document;          // one or more documents to insert into the collection
 }
 
 /*
@@ -98,23 +104,23 @@ data MongoInsert{
   The database will respond to an OP_QUERY message with an OP_REPLY message.
 */
 data MongoQuery{
-  MongoMessage header;                 // standard message header
+  MongoHeader header;                 // standard message header
   int32     flags;                  // bit vector of query options.  See below for details.
   char  fullCollectionName[];    // "dbname.collectionname"
   int32     numberToSkip;           // number of documents to skip
   int32     numberToReturn;         // number of documents to return
                                     //  in the first OP_REPLY batch
-  BSONDocument  query;                  // query object.  See below for details.
+  BSONDocument  document;                  // query object.  See below for details.
 }
 
 data MongoQueryRF{
-  MongoMessage header;                 // standard message header
+  MongoHeader header;                 // standard message header
   int32     flags;                  // bit vector of query options.  See below for details.
   char  fullCollectionName[];    // "dbname.collectionname"
   int32     numberToSkip;           // number of documents to skip
   int32     numberToReturn;         // number of documents to return
                                     // in the first OP_REPLY batch
-  BSONDocument  query;                  // query object.  See below for details.
+  BSONDocument  document;                  // query object.  See below for details.
   BSONDocument  returnFieldsSelector;   // Selector indicating the field
 }
 
@@ -131,7 +137,7 @@ data MongoQueryRF{
   The database will respond to an OP_GET_MORE message with an OP_REPLY message.
 */
 data MongoGetMore{
-  MongoMessage header;             // standard message header
+  MongoHeader header;             // standard message header
   int32     ZERO;               // 0 - reserved for future use
   char   fullCollectionName[]; // "dbname.collectionname"
   int32     numberToReturn;     // number of documents to return
@@ -153,11 +159,11 @@ data MongoGetMore{
   There is no response to an OP_DELETE message.
 */
 data MongoDelete{
-  MongoMessage header;          // standard message header
+  MongoHeader header;          // standard message header
   int32     ZERO;               // 0 - reserved for future use
   char   fullCollectionName[]; // "dbname.collectionname"
   int32     flags;              // bit vector - see below for details.
-  BSONDocument  selector;           // query object.  See below for details.
+  BSONDocument  document;           // query object.  See below for details.
 }
 
 /*
@@ -170,7 +176,7 @@ cursorIDs
 If a cursor is read until exhausted (read until OP_QUERY or OP_GET_MORE returns zero for the cursor id), there is no need to kill the cursor.
 */
 data MongoKillCursors {
-    MongoMessage header;         // standard message header
+    MongoHeader header;         // standard message header
     int32     ZERO;              // 0 - reserved for future use
     int32     numberOfCursorIDs; // number of cursorIDs in message
     int64    cursorIDs[];         // sequence of cursorIDs to close
@@ -180,7 +186,7 @@ data MongoKillCursors {
   Could be useful for feedback?
 */
 data MongoDiagnosticMessage{
-  MongoMessage header;  // standard message header
+  MongoHeader header;  // standard message header
   char   message[]; // message for the database
 }
 
@@ -196,7 +202,7 @@ data MongoDiagnosticMessage{
   The cursorID that this OP_REPLY is a part of. In the event that the result set of the query fits into one OP_REPLY message, cursorID will be 0. This cursorID must be used in any OP_GET_MORE messages used to get more data, and also must be closed by the client when no longer needed via a OP_KILL_CURSORS message.
 */
 data MongoReply{
-  MongoMessage header;      // standard message header
+  MongoHeader header;      // standard message header
   int32     responseFlags;  // bit vector - see details below
   int64     cursorID;       // cursor id if client needs to do get more's
   int32     startingFrom;   // where in the cursor this reply is starting
@@ -206,9 +212,9 @@ data MongoReply{
 
 interface MongoDB {
 	MongoDB(char ip[], int port);
-	JSONElement insert(JSONElement jsonQuery);
-	JSONElement find(JSONElement jsonQuery);
-  JSONElement findAndSort(JSONElement jsonQuery, JSONElement modified);
-	JSONElement update(JSONElement jsonQuery);
-	JSONElement delete(JSONElement jsonQuery);
+	void insert(char collection[], JSONElement jsonQuery[]);
+	JSONElement find(char collection[], JSONElement jsonQuery, int32 numberToReturn);
+  JSONElement findWithModifier(char collection[], JSONElement jsonQuery, JSONElement modifier, int32 numberToReturn);
+	JSONElement update(char collection[], JSONElement jsonQuery, JSONElement update);
+	JSONElement delete(char collection[], JSONElement jsonQuery);
 }

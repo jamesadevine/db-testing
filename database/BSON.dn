@@ -1,16 +1,10 @@
-const byte JSON_ELEMENT_OBJECT	= 1;
-const byte JSON_ELEMENT_STRING	= 2;
-const byte JSON_ELEMENT_NUMBER	= 3;
-const byte JSON_ELEMENT_BOOLEAN	= 4;
-const byte JSON_ELEMENT_ARRAY	= 5;
-
 uses data.json.JSONParser;
 
-component provides BSON requires io.Output out{
+component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil su, database.ByteUtil bu{
 
   BSONDocument BSON:serialise(JSONElement json){
-    BSONDocument bson;
-    digestJSONElement(json,bson);
+    BSONDocument bson = new BSONDocument("");
+    digestJSONElement(json, bson);
     return bson;
   }
 
@@ -19,61 +13,84 @@ component provides BSON requires io.Output out{
     return e;
   }
 
+  void serialiseName(char value[], BSONDocument bson){
+    bson.value = new char[](bson.value, value, BSON_NULL_TERMINATOR);
+  }
+
+  void serialiseString(char value[], BSONDocument bson){
+    bson.value = new char[](bson.value, value, BSON_NULL_TERMINATOR);
+  }
+
+  void serialiseNumber(char value[], BSONDocument bson){
+    int32 formatInt32 = iu.intFromString(value);
+
+    byte b[] = dana.getByteArrayOf(formatInt32);
+
+    b = bu.reverse(b);
+
+    bson.value = new char[](bson.value, b);
+  }
+
+  void serialiseBoolean(char value[], BSONDocument bson){
+    if(su.iequal(value,"true"))
+      bson.value = new char[](bson.value, BSON_BOOL_TRUE);
+    else
+      bson.value = new char[](bson.value, BSON_BOOL_FALSE);
+  }
+
   void digestJSONElement(JSONElement element, BSONDocument bson){
 
+    out.println("$(element.name), $(iu.intToString(element.type))");
+
     if(element.type == JSON_ELEMENT_OBJECT){
-      serialiseName(element.name, bson);
-      serialiseObject(element.value, bson);
+      out.println("OBJECT");
+      bson.value = new char[](bson.value, BSON_EMBEDDED_DOCUMENT);
+
+      if(element.name.arrayLength > 0)
+        serialiseName(element.name, bson);
+
+      for(int i = 0; i < element.children.arrayLength; i++)
+        digestJSONElement(element.children[i], bson);
     }
 
     if(element.type == JSON_ELEMENT_STRING){
+
+
+      out.println("STRING");
+      bson.value = new char[](bson.value, BSON_STRING);
+
       serialiseName(element.name, bson);
+
       serialiseString(element.value, bson);
     }
 
     if(element.type == JSON_ELEMENT_NUMBER){
+      out.println("INT");
+      bson.value = new char[](bson.value, BSON_INT_32);
+
       serialiseName(element.name, bson);
+
       serialiseNumber(element.value, bson);
     }
 
     if(element.type == JSON_ELEMENT_BOOLEAN){
+      out.println("BOOL");
+      bson.value = new char[](bson.value, BSON_BOOL);
+
       serialiseName(element.name, bson);
+
       serialiseBoolean(element.value, bson);
     }
 
     if(element.type == JSON_ELEMENT_ARRAY){
-      serialiseName(element.name, bson);
-      serialiseArray(element.value, bson);
+      out.println("ARRAY");
+      bson.value = new char[](bson.value, BSON_BOOL);
+
+      if(element.name.arrayLength > 0)
+        serialiseName(element.name, bson);
+
+      for(int i = 0; i < element.children.arrayLength; i++){
+        digestJSONElement(element.children[i], bson);
     }
-
-
-    for(int i = 0; i < element.children.arrayLength; i++){
-      digestJSONElement(element.children[i],bson);
-    }
   }
-
-  void serialiseName(char value[], BSONDocument bson){
-
-  }
-
-  void serialiseObject(char value[], BSONDocument bson){
-
-  }
-
-  void serialiseString(char value[], BSONDocument bson){
-
-  }
-
-  void serialiseNumber(char value[], BSONDocument bson){
-
-  }
-
-  void serialiseBoolean(char value[], BSONDocument bson){
-
-  }
-
-  void serialiseArray(char value[], BSONDocument bson){
-
-  }
-
 }

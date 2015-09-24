@@ -1,0 +1,13 @@
+component provides ByteUtil requires io.Output out{
+
+  byte[] ByteUtil:reverse(byte bytes[]){
+
+    byte reversed[] = new byte[bytes.arrayLength];
+
+    for(int i = 0; i < bytes.arrayLength; i++)
+        reversed[i] = bytes[(bytes.arrayLength - 1) - i];
+
+    return reversed;
+  }
+
+}

@@ -1,44 +1,240 @@
-component provides MongoDB requires io.Output out, data.json.JSONParser parser, net.TCPSocket client{
+uses data.String;
 
-  char HOSTIP = "";
+component provides MongoDB requires io.Output out, data.json.JSONParser parser, database.BSON bson, net.TCPSocket client, data.IntUtil iu, data.StringUtil su, util.RandomInt ri, database.ByteUtil bu, time.Calendar cal, time.DateUtil du{
+
+  char HOSTIP[] = "";
 	int HOSTPORT = 0;
 
   MongoDB:MongoDB(char ip[], int port){
+    //set our hostip and port for this instance.
     HOSTIP = ip;
     HOSTPORT = port;
+
+    //generate our seed for MongoDB connections.
+    //you should never need more than one MongoDB instance to talk to the same
+    //database...
+
+    int rand_seed = 0;
+
+    String explodedIP[] = su.explode(ip,".");
+
+    for(int i = 0; i < explodedIP.arrayLength; i++)
+      rand_seed += iu.intFromString(explodedIP[i].string);
+
+    rand_seed += port;
+
+    ri.setSeed(rand_seed);
+
+    //validate connection
+    connect();
+    disconnect();
   }
 
-  JSONElement MongoDB:insert(JSONElement jsonQuery){
+  void connect(){
     if (client.connect(HOSTIP, HOSTPORT)) {
-      //client.send();
-      client.disconnect();
+      return;
+    }else{
+      throw new Exception("No database instance is running at: $(HOSTIP):$(iu.intToString(HOSTPORT)).");
     }
+  }
+
+  void disconnect(){
+    client.disconnect();
+  }
+
+  void MongoDB:insert(char collection[], JSONElement jsonQuery[]){
+
+    out.println("$(iu.intToString(jsonQuery.arrayLength))");
+
+    if(jsonQuery.arrayLength == 0)
+      throw new Exception("An empty array is not a valid query.");
+
+    BSONDocument queries[] = bson.serialise(jsonQuery[0]);
+
+    for(int i = 1; i < jsonQuery.arrayLength; i++){
+
+      BSONDocument doc = bson.serialise(jsonQuery[i]);
+
+      queries = new BSONDocument[](queries, doc);
+    }
+
+    //iterate queries, we write to the socket one at a time as per the spec!
+    for(int i = 0; i < queries.arrayLength; i++){
+
+      MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + queries[i].value.arrayLength + 4 + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_INSERT);
+
+      MongoInsert ins = new MongoInsert(mh, 0, collection, queries[i]);
+
+      send(serialiseMongoInsert(ins));
+    }
+  }
+
+  JSONElement MongoDB:find(char collection[], JSONElement jsonQuery, int32 numberToReturn){
+
+    BSONDocument bsonQuery = bson.serialise(jsonQuery);
+
+    MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + bsonQuery.value.arrayLength + 12 + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_QUERY);
+
+    MongoQuery query = new MongoQuery(mh, 0, collection, 0, numberToReturn, bsonQuery);
+
+    send(serialiseMongoQuery(query));
+    byte received[] = receive();
+
     return jsonQuery;
   }
 
-  JSONElement MongoDB:find(JSONElement jsonQuery){
+  JSONElement MongoDB:findWithModifier(char collection[], JSONElement jsonQuery, JSONElement modifier, int32 numberToReturn){
+
+    BSONDocument bsonQuery = bson.serialise(jsonQuery);
+    BSONDocument bsonModifier = bson.serialise(modifier);
+
+    MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + bsonQuery.value.arrayLength + bsonModifier.value.arrayLength + 12 + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_QUERY);
+
+    MongoQueryRF queryRF = new MongoQueryRF(mh, 0, collection, 0, numberToReturn, bsonQuery, bsonModifier);
+
+    send(serialiseMongoQueryRF(queryRF));
+    byte received[] = receive();
+
     return jsonQuery;
   }
 
-  JSONElement MongoDB:findAndSort(JSONElement jsonQuery, JSONElement modifier){
+  JSONElement MongoDB:update(char collection[], JSONElement jsonQuery, JSONElement updateObject){
+
+    BSONDocument selector = bson.serialise(jsonQuery);
+    BSONDocument bsonUpdate = bson.serialise(updateObject);
+
+    MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + selector.value.arrayLength + bsonUpdate.value.arrayLength + 8 + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_UPDATE);
+
+    MongoUpdate update = new MongoUpdate(mh, 0, collection, 0, selector, bsonUpdate);
+
+    send(serialiseMongoUpdate(update));
+    byte received[] = receive();
+
     return jsonQuery;
   }
 
-  JSONElement MongoDB:update(JSONElement jsonQuery){
+  JSONElement MongoDB:delete(char collection[], JSONElement jsonQuery){
+
+    BSONDocument selector = bson.serialise(jsonQuery);
+
+    MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + selector.value.arrayLength + 8 + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_DELETE);
+
+    MongoDelete delete = new MongoDelete(mh, 0, collection, 0, selector);
+
+    send(serialiseMongoDelete(delete));
+    byte received[] = receive();
+
     return jsonQuery;
   }
 
-  JSONElement MongoDB:delete(JSONElement jsonQuery){
-    return jsonQuery;
-  }
+  byte[] serialiseMongoHeader(MongoHeader mh){
 
-  byte[] serialiseMongoQuery(){
     byte serialised[];
+
+    serialised = bu.reverse(new byte[](mh.messageLength));
+
+    serialised = new byte[](serialised, bu.reverse(new byte[](mh.requestID)));
+
+    serialised = new byte[](serialised, bu.reverse(new byte[](mh.responseTo)));
+
+    serialised = new byte[](serialised, bu.reverse(new byte[](mh.opCode)));
+
     return serialised;
   }
 
-  byte[] serialiseMongoQueryRF(){
-    byte serialised[];
+  byte[] serialiseMongoInsert(MongoInsert ins){
+
+    byte serialised[] = serialiseMongoHeader(ins.header);
+
+    serialised = new byte[](serialised, bu.reverse(new byte[](ins.flags)));
+    serialised = new byte[](serialised, new byte[](ins.fullCollectionName));
+    serialised = new byte[](serialised, new byte[](ins.document.value));
+
     return serialised;
   }
+
+  byte[] serialiseMongoQuery(MongoQuery query){
+
+    byte serialised[] = serialiseMongoHeader(query.header);
+
+    serialised = new byte[](serialised, bu.reverse(new byte[](query.flags)));
+    serialised = new byte[](serialised, new byte[](query.fullCollectionName));
+    serialised = new byte[](serialised, bu.reverse(new byte[](query.numberToSkip)));
+    serialised = new byte[](serialised, bu.reverse(new byte[](query.numberToReturn)));
+    serialised = new byte[](serialised, new byte[](query.document.value));
+
+    return serialised;
+  }
+
+  byte[] serialiseMongoQueryRF(MongoQueryRF queryRF){
+
+    byte serialised[] = serialiseMongoHeader(queryRF.header);
+
+    serialised = new byte[](serialised, bu.reverse(new byte[](queryRF.flags)));
+    serialised = new byte[](serialised, new byte[](queryRF.fullCollectionName));
+    serialised = new byte[](serialised, bu.reverse(new byte[](queryRF.numberToSkip)));
+    serialised = new byte[](serialised, bu.reverse(new byte[](queryRF.numberToReturn)));
+    serialised = new byte[](serialised, new byte[](queryRF.document.value));
+    serialised = new byte[](serialised, new byte[](queryRF.returnFieldsSelector.value));
+
+    return serialised;
+  }
+
+  byte[] serialiseMongoDelete(MongoDelete delete){
+
+    byte serialised[] = serialiseMongoHeader(delete.header);
+
+    serialised = new byte[](serialised, bu.reverse(new byte[](delete.ZERO)));
+    serialised = new byte[](serialised, new byte[](delete.fullCollectionName));
+    serialised = new byte[](serialised, bu.reverse(new byte[](delete.flags)));
+    serialised = new byte[](serialised, new byte[](delete.document.value));
+
+    return serialised;
+  }
+
+  byte[] serialiseMongoUpdate(MongoUpdate update){
+
+    byte serialised[] = serialiseMongoHeader(update.header);
+
+    serialised = new byte[](serialised, bu.reverse(new byte[](update.ZERO)));
+    serialised = new byte[](serialised, new byte[](update.fullCollectionName));
+    serialised = new byte[](serialised, bu.reverse(new byte[](update.flags)));
+    serialised = new byte[](serialised, new byte[](update.selector.value));
+    serialised = new byte[](serialised, new byte[](update.update.value));
+
+    return serialised;
+  }
+
+  void send(byte packet[]){
+    connect();
+    client.send(packet);
+    disconnect();
+  }
+
+  byte[] receive(){
+
+    byte received[];
+
+    byte buf[];
+
+    connect();
+
+    /*int previous = du.toMilliseconds(cal.getTime());
+
+    int current = du.toMilliseconds(cal.getTime());*/
+
+    while ((buf = client.recv(1)).arrayLength > 0){
+
+      /*received = new byte[](received, buf);
+
+      if(current - previous > MONGO_TIMEOUT_VALUE)
+        throw new Error("Timeout whilst waiting for a response");*/
+
+    }
+
+    disconnect();
+
+    return received;
+  }
+
 }
