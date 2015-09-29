@@ -31,11 +31,10 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
   }
 
   void connect(){
-    if (client.connect(HOSTIP, HOSTPORT)) {
+    if (client.connect(HOSTIP, HOSTPORT))
       return;
-    }else{
+    else
       throw new Exception("No database instance is running at: $(HOSTIP):$(iu.intToString(HOSTPORT)).");
-    }
   }
 
   void disconnect(){
