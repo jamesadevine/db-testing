@@ -10,4 +10,14 @@ component provides ByteUtil requires io.Output out{
     return reversed;
   }
 
+  byte[] ByteUtil:toLittleEndian(int value){
+    int32 formatInt32 = value;
+
+    byte b[] = dana.getByteArrayOf(formatInt32);
+
+    b = reverse(b);
+
+    return b;
+  }
+
 }

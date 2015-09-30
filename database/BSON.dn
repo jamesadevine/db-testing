@@ -3,9 +3,16 @@ uses data.json.JSONParser;
 component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil su, database.ByteUtil bu{
 
   BSONDocument BSON:serialise(JSONElement json){
-    BSONDocument bson = new BSONDocument("");
-    digestJSONElement(json, bson);
-    return bson;
+
+    BSONDocument bsonFromJson = digestJSONElement(json);
+
+    //prepend document size including the size of the number, and the byte for the null terminator
+    bsonFromJson.value = new byte[](bu.toLittleEndian(bsonFromJson.value.arrayLength + 5),bsonFromJson.value);
+
+    //append document terminator
+    bsonFromJson.value = new byte[](bsonFromJson.value, BSON_NULL_TERMINATOR);
+
+    return bsonFromJson;
   }
 
   JSONElement BSON:deserialise(BSONDocument bson){
@@ -14,40 +21,181 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
   }
 
   void serialiseName(char value[], BSONDocument bson){
-    bson.value = new char[](bson.value, value, BSON_NULL_TERMINATOR);
+    bson.value = new byte[](bson.value, value, BSON_NULL_TERMINATOR);
   }
 
   void serialiseString(char value[], BSONDocument bson){
-    bson.value = new char[](bson.value, value, BSON_NULL_TERMINATOR);
+    bson.value = new byte[](bson.value, value, BSON_NULL_TERMINATOR);
   }
 
   void serialiseNumber(char value[], BSONDocument bson){
-    int32 formatInt32 = iu.intFromString(value);
-
-    byte b[] = dana.getByteArrayOf(formatInt32);
-
-    b = bu.reverse(b);
-
-    bson.value = new char[](bson.value, b);
+    bson.value = new byte[](bson.value, bu.toLittleEndian(iu.intFromString(value)));
   }
 
   void serialiseBoolean(char value[], BSONDocument bson){
     if(su.iequal(value,"true"))
-      bson.value = new char[](bson.value, BSON_BOOL_TRUE);
+      bson.value = new byte[](bson.value, BSON_BOOL_TRUE);
     else
-      bson.value = new char[](bson.value, BSON_BOOL_FALSE);
+      bson.value = new byte[](bson.value, BSON_BOOL_FALSE);
   }
 
-  void digestJSONElement(JSONElement element, BSONDocument bson){
+  BSONDocument digestJSONElement(JSONElement element){
 
+    BSONDocument bson = new BSONDocument("");
+
+    if(element.type == JSON_ELEMENT_OBJECT){
+
+      out.println("OBJECT!!!");
+
+      /*
+        if this element doesn't have a name - we can presume we are digesting
+        for the first time.
+
+        TODO:
+        It may make more sense to pass a bool on first iteration, and throw
+        an error on parsing an object without a name, in subsequent iterations
+      */
+
+      if(element.name.arrayLength > 0){
+        out.println("NAME: $(element.name)");
+        //add our type
+        bson.value = new byte[](bson.value, BSON_EMBEDDED_DOCUMENT);
+
+        //add our name
+        serialiseName(element.name, bson);
+      }
+
+      /*
+        For this, we need to know the size of our children, thereby their structures.
+
+        We then recursively descend into each child element, and resolve by combining
+        the child with the children bson document
+      */
+      BSONDocument children = new BSONDocument("");
+
+      out.println("OBJECT LENGTH $(iu.intToString(element.children.arrayLength))");
+
+      for(int i = 0; i < element.children.arrayLength; i++){
+
+        //out.println("$(iu.intToString(i))-- OBJECT CHILD:$(iu.intToString(element.children[i].type)) || $(element.children[i].name) || $(element.children[i].value)");
+
+        BSONDocument newChild = digestJSONElement(element.children[i]);
+
+        out.println("$(iu.intToString(i))-- OBJECT CHILD:$(iu.intToString(element.children[i].type)) || $(element.children[i].name) || $(element.children[i].value)");
+
+        children.value = new byte[](children.value, newChild.value);
+      }
+
+      //after we have returned, combine the children, the childrens length
+      //with our bson document.
+      //it's inclusive so add 4 for an int32
+      if(element.name.arrayLength > 0)
+        bson.value = new byte[](bson.value,bu.toLittleEndian(children.value.arrayLength + 4), children.value);
+      else
+        bson.value = new byte[](bson.value,children.value);
+
+      //resolve
+      return bson;
+    }
+
+    if(element.type == JSON_ELEMENT_STRING){
+      //add our type
+      bson.value = new byte[](bson.value, BSON_UTF8);
+
+      if(element.name.arrayLength  == 0)
+        throw new Exception("Strings must have an associated name, unless they are in an array");
+
+      //add our name
+      serialiseName(element.name, bson);
+
+      //get the length of the data (Plus one for null terminator)
+      bson.value = new byte[](bson.value, bu.toLittleEndian(element.value.arrayLength + 1));
+
+      //add the string
+      serialiseString(element.value, bson);
+
+      return bson;
+    }
+
+    if(element.type == JSON_ELEMENT_NUMBER){
+
+      bson.value = new byte[](bson.value, BSON_INT_32);
+
+      serialiseName(element.name, bson);
+
+      serialiseNumber(element.value, bson);
+
+      return bson;
+    }
+
+    if(element.type == JSON_ELEMENT_BOOLEAN){
+
+      bson.value = new byte[](bson.value, BSON_BOOL);
+
+      serialiseName(element.name, bson);
+
+      serialiseBoolean(element.value, bson);
+
+      return bson;
+    }
+
+    if(element.type == JSON_ELEMENT_ARRAY){
+      out.println("ARRAY");
+      bson.value = new byte[](bson.value, BSON_ARRAY);
+
+      if(element.name.arrayLength == 0){
+        throw new Exception("Invalid BSON structure: an array must have an associated name");
+        return bson;
+      }
+
+      serialiseName(element.name, bson);
+
+      /*
+        For this, we need to know the size of our children, and thereby their structures.
+
+        We then recursively descend into each child element, and resolve by combining
+        the child with the children bson document
+      */
+      BSONDocument children = new BSONDocument("");
+
+      out.println("ARRAY LENGTH $(iu.intToString(element.children.arrayLength))");
+
+      for(int i = 0; i < element.children.arrayLength; i++){
+
+        out.println("ARRAY CHILD:$(iu.intToString(element.children[i].type)) || $(element.children[i].name) || $(element.children[i].value)");
+
+        JSONElement newParent = new JSONElement(element.children[i].type, iu.intToString(i), element.children[i].value, element.children[i].children);
+
+        BSONDocument newChild = digestJSONElement(newParent);
+
+        children.value = new byte[](children.value, newChild.value);
+      }
+
+      //after we have returned, combine the children, the childrens length
+      //with our bson document.
+      //it's inclusive so add 4 for an int32
+      byte lengthOfChildren[] = bu.toLittleEndian(children.value.arrayLength + 4);
+      bson.value = new byte[](bson.value,lengthOfChildren,children.value, BSON_NULL_TERMINATOR);
+
+      //resolve
+      return bson;
+    }
+
+    return bson;
+  }
+/*
+  void digestJSONElement(JSONElement element, BSONDocument bson){
     out.println("$(element.name), $(iu.intToString(element.type))");
 
     if(element.type == JSON_ELEMENT_OBJECT){
       out.println("OBJECT");
-      bson.value = new char[](bson.value, BSON_EMBEDDED_DOCUMENT);
 
-      if(element.name.arrayLength > 0)
+
+      if(element.name.arrayLength > 1){
+        out.println("length: $(iu.intToString(element.name.arrayLength))");
+        bson.value = new char[](bson.value, BSON_EMBEDDED_DOCUMENT);
         serialiseName(element.name, bson);
+      }
 
       for(int i = 0; i < element.children.arrayLength; i++)
         digestJSONElement(element.children[i], bson);
@@ -84,13 +232,22 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
 
     if(element.type == JSON_ELEMENT_ARRAY){
       out.println("ARRAY");
-      bson.value = new char[](bson.value, BSON_BOOL);
+      bson.value = new char[](bson.value, BSON_ARRAY);
 
-      if(element.name.arrayLength > 0)
-        serialiseName(element.name, bson);
+      if(element.name.arrayLength == 0){
+        throw new Exception("Invalid BSON structure: an array must have an associated name");
+        return;
+      }
+
+      serialiseName(element.name, bson);
+
+      BSONDocument children = new BSONDocument("");
 
       for(int i = 0; i < element.children.arrayLength; i++){
-        digestJSONElement(element.children[i], bson);
+        BSONDocument newChild = digestJSONElement(element.children[i], bson);
+      }
     }
+
   }
+*/
 }

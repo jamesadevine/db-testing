@@ -21,7 +21,7 @@ const char BSON_NULL_TERMINATOR = 0x00;
 uses data.json.JSONParser;
 
 data BSONDocument{
-  copy char value[];
+  copy byte value[];
 }
 
 interface BSON {
