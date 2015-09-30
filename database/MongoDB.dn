@@ -57,6 +57,37 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
       queries = new BSONDocument[](queries, doc);
     }
 
+    /*
+      start bson to diagnose issues
+    */
+
+    byte testPacket[] = new byte[](bu.toLittleEndian(22));
+    testPacket = new byte[](testPacket, 2);
+    testPacket = new byte[](testPacket, new char[]("hello", BSON_NULL_TERMINATOR));
+    testPacket = new byte[](testPacket, bu.toLittleEndian(6));
+    testPacket = new byte[](testPacket, new char[]("world", BSON_NULL_TERMINATOR));
+    testPacket = new byte[](testPacket, 0);
+
+    for(int i = 0; i < testPacket.arrayLength; i++){
+      char c = testPacket[i];
+      out.println("Test Packet|| character : $(c) integer: $(iu.intToString(testPacket[i]))\n");
+    }
+
+    BSONDocument bsonTesting = bson.serialise(jsonQuery[0]);
+
+    for(int i = 0; i < bsonTesting.value.arrayLength; i++){
+      char c = bsonTesting.value[i];
+      out.println("BSONTesting -- LENGTH: $(iu.intToString(bsonTesting.value.arrayLength))|| character : $(c) integer: $(iu.intToString(bsonTesting.value[i]))\n");
+    }
+
+    MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + testPacket.arrayLength + 4 + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_INSERT);
+
+    MongoInsert ins = new MongoInsert(mh, 0, collection, bsonTesting);
+
+    send(serialiseMongoHeader(ins.header), serialiseMongoInsert(ins));
+
+    /*
+
     //iterate queries, we write to the socket one at a time as per the spec!
     for(int i = 0; i < queries.arrayLength; i++){
 
@@ -64,8 +95,8 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
 
       MongoInsert ins = new MongoInsert(mh, 0, collection, queries[i]);
 
-      send(serialiseMongoInsert(ins));
-    }
+      send(serialiseMongoHeader(ins.header), serialiseMongoInsert(ins));
+    }*/
   }
 
   JSONElement MongoDB:find(char collection[], JSONElement jsonQuery, int32 numberToReturn){
@@ -76,7 +107,7 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
 
     MongoQuery query = new MongoQuery(mh, 0, collection, 0, numberToReturn, bsonQuery);
 
-    send(serialiseMongoQuery(query));
+    //send(serialiseMongoQuery(query));
     byte received[] = receive();
 
     return jsonQuery;
@@ -91,7 +122,7 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
 
     MongoQueryRF queryRF = new MongoQueryRF(mh, 0, collection, 0, numberToReturn, bsonQuery, bsonModifier);
 
-    send(serialiseMongoQueryRF(queryRF));
+    //send(serialiseMongoQueryRF(queryRF));
     byte received[] = receive();
 
     return jsonQuery;
@@ -106,7 +137,7 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
 
     MongoUpdate update = new MongoUpdate(mh, 0, collection, 0, selector, bsonUpdate);
 
-    send(serialiseMongoUpdate(update));
+    //send(serialiseMongoUpdate(update));
     byte received[] = receive();
 
     return jsonQuery;
@@ -120,7 +151,7 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
 
     MongoDelete delete = new MongoDelete(mh, 0, collection, 0, selector);
 
-    send(serialiseMongoDelete(delete));
+    //send(serialiseMongoDelete(delete));
     byte received[] = receive();
 
     return jsonQuery;
@@ -130,22 +161,26 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
 
     byte serialised[];
 
-    serialised = bu.reverse(new byte[](mh.messageLength));
+    serialised = bu.toLittleEndian(mh.messageLength);
 
-    serialised = new byte[](serialised, bu.reverse(new byte[](mh.requestID)));
+    serialised = new byte[](serialised, bu.toLittleEndian(mh.requestID));
 
-    serialised = new byte[](serialised, bu.reverse(new byte[](mh.responseTo)));
+    serialised = new byte[](serialised, bu.toLittleEndian(mh.responseTo));
 
-    serialised = new byte[](serialised, bu.reverse(new byte[](mh.opCode)));
+    serialised = new byte[](serialised, bu.toLittleEndian(mh.opCode));
+
+    /*for(int i = 0; i < serialised.arrayLength; i++){
+      char c = serialised[i];
+      out.println("HEADER character : $(c) integer: $(iu.intToString(serialised[i]))\n");
+    }*/
 
     return serialised;
   }
 
   byte[] serialiseMongoInsert(MongoInsert ins){
 
-    byte serialised[] = serialiseMongoHeader(ins.header);
+    byte serialised[] = bu.toLittleEndian(ins.flags);
 
-    serialised = new byte[](serialised, bu.reverse(new byte[](ins.flags)));
     serialised = new byte[](serialised, new byte[](ins.fullCollectionName));
     serialised = new byte[](serialised, new byte[](ins.document.value));
 
@@ -204,9 +239,10 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
     return serialised;
   }
 
-  void send(byte packet[]){
+  void send(byte header[], byte content[]){
     connect();
-    client.send(packet);
+    client.send(header);
+    client.send(content);
     disconnect();
   }
 

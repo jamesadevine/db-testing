@@ -1,7 +1,6 @@
-component provides App requires io.Output out, database.MongoDB, data.json.JSONParser parser, database.BSON bsonSerialiser{
+component provides App requires io.Output out, data.IntUtil iu, database.MongoDB, data.json.JSONParser parser, database.BSON bsonSerialiser{
 
 	int App:main(AppParam params[]) {
-
 
     JSONElement element = parser.parseDocument("{\"test\":33, \"arrayTest\":[{\"innerObjectTest\":43}]}");
     BSONDocument bson = bsonSerialiser.serialise(element);
@@ -9,17 +8,18 @@ component provides App requires io.Output out, database.MongoDB, data.json.JSONP
     byte bytes[] = bson.value;
 
     for(int i = 0; i < bson.value.arrayLength; i++){
-      char value = bson.value[i];
-      out.println("\"$(value)\"");
+      char charValue = bson.value[i];
+			int intValue = bson.value[i];
+      out.println("\"$(charValue), $(iu.intToString(intValue))\"");
     }
 
     MongoDB mongo = new MongoDB("127.0.0.1",27017);
 
     JSONElement elements[] = element;
 
-    JSONElement find = parser.parseDocument("{\"test\":33}");
+    JSONElement find = parser.parseDocument("{\"test\":33, \"arrayTest\":[{\"innerObjectTest\":43}]}");
 
-    mongo.find("db.test",find, 100);
+    mongo.insert("db.testing",find);
 
 		return 0;
 	}

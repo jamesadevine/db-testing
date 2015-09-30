@@ -1,3 +1,4 @@
 interface ByteUtil{
   byte[] reverse(byte bytes[]);
+  byte[] toLittleEndian(int value);
 }
