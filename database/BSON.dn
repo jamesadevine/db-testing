@@ -77,9 +77,11 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
 
       for(int i = 0; i < element.children.arrayLength; i++){
 
-        out.println("$(iu.intToString(i))-- OBJECT CHILD:$(iu.intToString(element.children[i].type)) || $(element.children[i].name) || $(element.children[i].value)");
+        //out.println("$(iu.intToString(i))-- OBJECT CHILD:$(iu.intToString(element.children[i].type)) || $(element.children[i].name) || $(element.children[i].value)");
 
         BSONDocument newChild = digestJSONElement(element.children[i]);
+
+        out.println("$(iu.intToString(i))-- OBJECT CHILD:$(iu.intToString(element.children[i].type)) || $(element.children[i].name) || $(element.children[i].value)");
 
         children.value = new byte[](children.value, newChild.value);
       }
