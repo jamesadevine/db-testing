@@ -1,0 +1,43 @@
+component provides UUID requires io.Output out, data.IntUtil iu, util.RandomInt ri, time.Calendar cal, time.DateUtil du{
+
+  int ASCII_VALID_RANGE0[] = new int[](48, 57);
+  int ASCII_VALID_RANGE1[] = new int[](97, 102);
+
+  char[] UUID:generate(int length){
+
+    char uuid[] = "";
+
+    if(length % 2 != 0){
+      throw new Exception("The UUID generator can only generate an even length uuid, as per the specification.");
+      return uuid;
+    }
+
+
+    int randomNumber = 0;
+    int rand_seed = 0;
+
+    for(int i = 0; i < length; i++){
+
+      //set our seed each time
+      rand_seed = du.toMilliseconds(cal.getTime());
+
+      ri.setSeed(rand_seed);
+
+      //check if we are between a range...
+      while(!between(randomNumber = ri.get(ASCII_VALID_RANGE1[1] + 1),ASCII_VALID_RANGE1[0],ASCII_VALID_RANGE1[1]) && !between(randomNumber, ASCII_VALID_RANGE0[0], ASCII_VALID_RANGE0[1]));
+
+      //concatenate!
+      uuid = new char[](uuid,randomNumber);
+    }
+
+    return uuid;
+  }
+
+  //should this be in int util? :)
+  bool between(int value, int lower, int upper){
+    if(value <= upper && value >=lower)
+      return true;
+
+    return false;
+  }
+}
