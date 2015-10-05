@@ -12,12 +12,31 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
     //append document terminator
     bsonFromJson.value = new byte[](bsonFromJson.value, BSON_NULL_TERMINATOR);
 
+    out.println(" TOTAL LENGTH: $(iu.intToString(bsonFromJson.value.arrayLength))");
+
+
     return bsonFromJson;
   }
 
   JSONElement BSON:deserialise(BSONDocument bson){
-    JSONElement e;
-    return e;
+    return new JSONElement(JSON_ELEMENT_OBJECT, "", "", digestBSONDocument(bson));
+  }
+
+  BSONDocument[] BSON:parse(byte bsonDocuments[]){
+
+    BSONDocument docs[];
+
+    int byteCount = 0;
+
+    while(byteCount < bsonDocuments.arrayLength){
+      int32 size = bu.toInteger(bu.reverse(su.subString(bsonDocuments,byteCount,4)));
+
+      docs = new BSONDocument[](docs, new BSONDocument(su.subString(bsonDocuments,byteCount,size)));
+
+      byteCount += size;
+    }
+
+    return docs;
   }
 
   void serialiseName(char value[], BSONDocument bson){
@@ -42,6 +61,26 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
   BSONDocument digestJSONElement(JSONElement element){
 
     BSONDocument bson = new BSONDocument("");
+
+    if(element.name == "_id"){
+
+      out.println("WE ARE IN ID");
+
+      //add our type
+      bson.value = new byte[](bson.value, BSON_OBJECT_ID);
+
+      if(element.name.arrayLength  == 0)
+        throw new Exception("Strings must have an associated name, unless they are in an array");
+
+      //add our name
+      serialiseName(element.name, bson);
+
+      //get the length of the data (Plus one for null terminator)
+      bson.value = new byte[](bson.value, element.value);
+
+      //resolve
+      return bson;
+    }
 
     if(element.type == JSON_ELEMENT_OBJECT){
 
@@ -77,11 +116,9 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
 
       for(int i = 0; i < element.children.arrayLength; i++){
 
-        //out.println("$(iu.intToString(i))-- OBJECT CHILD:$(iu.intToString(element.children[i].type)) || $(element.children[i].name) || $(element.children[i].value)");
+        out.println("$(iu.intToString(i))-- OBJECT CHILD:$(iu.intToString(element.children[i].type)) || $(element.children[i].name) || $(element.children[i].value)");
 
         BSONDocument newChild = digestJSONElement(element.children[i]);
-
-        out.println("$(iu.intToString(i))-- OBJECT CHILD:$(iu.intToString(element.children[i].type)) || $(element.children[i].name) || $(element.children[i].value)");
 
         children.value = new byte[](children.value, newChild.value);
       }
@@ -90,7 +127,7 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
       //with our bson document.
       //it's inclusive so add 4 for an int32
       if(element.name.arrayLength > 0)
-        bson.value = new byte[](bson.value,bu.toLittleEndian(children.value.arrayLength + 4), children.value);
+        bson.value = new byte[](bson.value,bu.toLittleEndian(children.value.arrayLength + 5), children.value, BSON_NULL_TERMINATOR);
       else
         bson.value = new byte[](bson.value,children.value);
 
@@ -174,7 +211,7 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
       //after we have returned, combine the children, the childrens length
       //with our bson document.
       //it's inclusive so add 4 for an int32
-      byte lengthOfChildren[] = bu.toLittleEndian(children.value.arrayLength + 4);
+      byte lengthOfChildren[] = bu.toLittleEndian(children.value.arrayLength + 5);
       bson.value = new byte[](bson.value,lengthOfChildren,children.value, BSON_NULL_TERMINATOR);
 
       //resolve
@@ -183,71 +220,141 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
 
     return bson;
   }
-/*
-  void digestJSONElement(JSONElement element, BSONDocument bson){
-    out.println("$(element.name), $(iu.intToString(element.type))");
-
-    if(element.type == JSON_ELEMENT_OBJECT){
-      out.println("OBJECT");
 
 
-      if(element.name.arrayLength > 1){
-        out.println("length: $(iu.intToString(element.name.arrayLength))");
-        bson.value = new char[](bson.value, BSON_EMBEDDED_DOCUMENT);
-        serialiseName(element.name, bson);
-      }
+  char[] bsonReadName(char content[], int count){
 
-      for(int i = 0; i < element.children.arrayLength; i++)
-        digestJSONElement(element.children[i], bson);
+    char name[] = "";
+
+    while(content[count] != 0){
+      name = new char[](name, content[count]);
+      count++;
     }
 
-    if(element.type == JSON_ELEMENT_STRING){
-
-
-      out.println("STRING");
-      bson.value = new char[](bson.value, BSON_STRING);
-
-      serialiseName(element.name, bson);
-
-      serialiseString(element.value, bson);
-    }
-
-    if(element.type == JSON_ELEMENT_NUMBER){
-      out.println("INT");
-      bson.value = new char[](bson.value, BSON_INT_32);
-
-      serialiseName(element.name, bson);
-
-      serialiseNumber(element.value, bson);
-    }
-
-    if(element.type == JSON_ELEMENT_BOOLEAN){
-      out.println("BOOL");
-      bson.value = new char[](bson.value, BSON_BOOL);
-
-      serialiseName(element.name, bson);
-
-      serialiseBoolean(element.value, bson);
-    }
-
-    if(element.type == JSON_ELEMENT_ARRAY){
-      out.println("ARRAY");
-      bson.value = new char[](bson.value, BSON_ARRAY);
-
-      if(element.name.arrayLength == 0){
-        throw new Exception("Invalid BSON structure: an array must have an associated name");
-        return;
-      }
-
-      serialiseName(element.name, bson);
-
-      BSONDocument children = new BSONDocument("");
-
-      for(int i = 0; i < element.children.arrayLength; i++){
-        BSONDocument newChild = digestJSONElement(element.children[i], bson);
-      }
-    }
-
+    return name;
   }
-*/
+
+  /*
+    Each time this is called, the algorithm is as follows:
+
+      * determine the size
+      * get the type
+      * process based on type
+
+        IF we are processing an array or object, rip off the bson representation
+        of these types and call the function again with the array of bytes,
+        described by the bson.
+
+        Otherwise, process the type, and continue reading in a while loop, until
+        the end of the document is reached.
+  */
+
+  JSONElement[] digestBSONDocument(BSONDocument document){
+
+    JSONElement elements[];
+
+    byte content[] = document.value;
+
+    int count = 0;
+
+    int size = bu.toInteger(bu.reverse(su.subString(content,count,4)));
+
+    count += 4;
+
+    //minus one for end of object
+    while(count < size - 1){
+
+      int type = content[count];
+
+      char name[] = bsonReadName(content,count);
+
+      count += name.arrayLength + 1;
+
+      if(type == BSON_EMBEDDED_DOCUMENT){
+
+        int objectSize =  bu.toInteger(bu.reverse(su.subString(content,count,4)));
+
+        elements = new JSONElement[](elements, new JSONElement(JSON_ELEMENT_OBJECT, name, "", digestBSONDocument(new BSONDocument(su.subString(content,count,objectSize)))));
+
+        count += objectSize;
+
+      }
+
+      if(type == BSON_UTF8){
+
+        char value[] = "";
+
+        int valueSize = bu.toInteger(bu.reverse(su.subString(content,count,4)));
+
+        //we've digested the size integer
+        count += 4;
+
+        int limit = count + valueSize;
+
+        while(count < limit){
+          value = new char[](value, content[count]);
+          count++;
+        }
+
+        elements = new JSONElement[](elements, new JSONElement(JSON_ELEMENT_STRING, name, value, new JSONElement()));
+      }
+
+      if(type == BSON_OBJECT_ID){
+
+        char value[] = "";
+
+        int limit = count + 12;
+
+        //add 48 for hexadecimal characters...
+        while(count < limit){
+
+          char newChar = content[count];
+
+          value = new char[](value, newChar);
+
+          count++;
+        }
+
+        elements = new JSONElement[](elements, new JSONElement(JSON_ELEMENT_STRING, name, value, new JSONElement()));
+      }
+
+      if(type == BSON_INT_32){
+
+        int value = bu.toInteger(bu.reverse(su.subString(content,count,4)));
+
+        //we've digested the integer
+        count += 4;
+
+        elements = new JSONElement[](elements, new JSONElement(JSON_ELEMENT_NUMBER, name, iu.intToString(value), new JSONElement()));
+      }
+
+      if(type == BSON_BOOL){
+
+        char value[] = "";
+
+        int boolData = content[count];
+
+        count++;
+
+        if(boolData == BSON_BOOL_TRUE)
+          value = "true";
+        else
+          value = "false";
+
+        elements = new JSONElement[](elements, new JSONElement(JSON_ELEMENT_BOOLEAN, name, iu.intToString(value), new JSONElement()));
+      }
+
+      if(type == BSON_ARRAY){
+
+        int arraySize =  bu.toInteger(bu.reverse(su.subString(content,count,4)));
+
+        elements = new JSONElement[](elements, new JSONElement(JSON_ELEMENT_ARRAY, name, "", digestBSONDocument(new BSONDocument(su.subString(content,count,arraySize)))));
+
+        count += arraySize;
+
+      }
+    }
+
+    return elements;
+  }
 }

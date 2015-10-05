@@ -1,4 +1,4 @@
-component provides ByteUtil requires io.Output out{
+component provides ByteUtil requires io.Output out, data.IntUtil iu{
 
   byte[] ByteUtil:reverse(byte bytes[]){
 
@@ -10,6 +10,15 @@ component provides ByteUtil requires io.Output out{
     return reversed;
   }
 
+  /*
+    these two functions could be combined into a single function...
+
+    It could:
+
+    * accept an integer
+    * turn to bytes
+    * return the new integer using toInteger? :)
+  */
   byte[] ByteUtil:toLittleEndian(int value){
     int32 formatInt32 = value;
 
@@ -18,6 +27,39 @@ component provides ByteUtil requires io.Output out{
     b = reverse(b);
 
     return b;
+  }
+
+  byte[] ByteUtil:toBigEndian(int value){
+    int32 formatInt32 = value;
+
+    byte b[] = dana.getByteArrayOf(formatInt32);
+
+    b = reverse(b);
+
+    return b;
+  }
+
+
+
+  int ByteUtil:toInteger(byte bytes[]){
+
+    int returnVal = 0;
+
+    int shift = bytes.arrayLength-1;
+
+    for(int i = 0; i < bytes.arrayLength; i++){
+
+      int temp = bytes[i];
+
+      temp <<= (8*shift);
+
+      returnVal |=  temp;
+
+      shift--;
+      //out.println("BYTE: $(iu.intToString(bytes[i])) returnVal: $(iu.intToString(returnVal)) shift: $(iu.intToString(shift))");
+    }
+
+    return returnVal;
   }
 
 }

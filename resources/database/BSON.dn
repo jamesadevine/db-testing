@@ -27,4 +27,5 @@ data BSONDocument{
 interface BSON {
   BSONDocument serialise(JSONElement json);
   JSONElement deserialise(BSONDocument bson);
+  BSONDocument[] parse(byte bsonDocuments[]);
 }

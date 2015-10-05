@@ -19,8 +19,7 @@ uses database.BSON;
 data MongoHeader{
   int32   messageLength; // total message size, including this
   int32   requestID;     // identifier for this message
-  int32   responseTo;    // requestID from the original request
-                         //   (used in reponses from db)
+  int32   responseTo;    // requestID from the original request (used in reponses from db)
   int32   opCode;        // request type - see table below
 }
 
@@ -43,7 +42,6 @@ data MongoHeader{
   There is no response to an OP_UPDATE message.
 */
 data MongoUpdate{
-    MongoHeader header;             // standard message header
     int32     ZERO;               // 0 - reserved for future use
     char   fullCollectionName[]; // "dbname.collectionname"
     int32     flags;              // bit vector. see below
@@ -66,7 +64,6 @@ data MongoUpdate{
   There is no response to an OP_INSERT message.
 */
 data MongoInsert{
-    MongoHeader header;             // standard message header
     int32     flags;              // bit vector - see below
     char   fullCollectionName[]; // "dbname.collectionname"
     BSONDocument document;          // one or more documents to insert into the collection
@@ -104,7 +101,6 @@ data MongoInsert{
   The database will respond to an OP_QUERY message with an OP_REPLY message.
 */
 data MongoQuery{
-  MongoHeader header;                 // standard message header
   int32     flags;                  // bit vector of query options.  See below for details.
   char  fullCollectionName[];    // "dbname.collectionname"
   int32     numberToSkip;           // number of documents to skip
@@ -114,7 +110,6 @@ data MongoQuery{
 }
 
 data MongoQueryRF{
-  MongoHeader header;                 // standard message header
   int32     flags;                  // bit vector of query options.  See below for details.
   char  fullCollectionName[];    // "dbname.collectionname"
   int32     numberToSkip;           // number of documents to skip
@@ -137,7 +132,6 @@ data MongoQueryRF{
   The database will respond to an OP_GET_MORE message with an OP_REPLY message.
 */
 data MongoGetMore{
-  MongoHeader header;             // standard message header
   int32     ZERO;               // 0 - reserved for future use
   char   fullCollectionName[]; // "dbname.collectionname"
   int32     numberToReturn;     // number of documents to return
@@ -159,7 +153,6 @@ data MongoGetMore{
   There is no response to an OP_DELETE message.
 */
 data MongoDelete{
-  MongoHeader header;          // standard message header
   int32     ZERO;               // 0 - reserved for future use
   char   fullCollectionName[]; // "dbname.collectionname"
   int32     flags;              // bit vector - see below for details.
@@ -176,7 +169,6 @@ cursorIDs
 If a cursor is read until exhausted (read until OP_QUERY or OP_GET_MORE returns zero for the cursor id), there is no need to kill the cursor.
 */
 data MongoKillCursors {
-    MongoHeader header;         // standard message header
     int32     ZERO;              // 0 - reserved for future use
     int32     numberOfCursorIDs; // number of cursorIDs in message
     int64    cursorIDs[];         // sequence of cursorIDs to close
@@ -202,7 +194,7 @@ data MongoDiagnosticMessage{
   The cursorID that this OP_REPLY is a part of. In the event that the result set of the query fits into one OP_REPLY message, cursorID will be 0. This cursorID must be used in any OP_GET_MORE messages used to get more data, and also must be closed by the client when no longer needed via a OP_KILL_CURSORS message.
 */
 data MongoReply{
-  MongoHeader header;      // standard message header
+  MongoHeader header;
   int32     responseFlags;  // bit vector - see details below
   int64     cursorID;       // cursor id if client needs to do get more's
   int32     startingFrom;   // where in the cursor this reply is starting
@@ -213,8 +205,8 @@ data MongoReply{
 interface MongoDB {
 	MongoDB(char ip[], int port);
 	void insert(char collection[], JSONElement jsonQuery[]);
-	JSONElement find(char collection[], JSONElement jsonQuery, int32 numberToReturn);
-  JSONElement findWithModifier(char collection[], JSONElement jsonQuery, JSONElement modifier, int32 numberToReturn);
-	JSONElement update(char collection[], JSONElement jsonQuery, JSONElement update);
-	JSONElement delete(char collection[], JSONElement jsonQuery);
+	JSONElement[] find(char collection[], JSONElement jsonQuery, int32 numberToReturn);
+  JSONElement[] findWithModifier(char collection[], JSONElement jsonQuery, JSONElement modifier, int32 numberToReturn);
+	void update(char collection[], JSONElement jsonQuery, JSONElement update);
+	void delete(char collection[], JSONElement jsonQuery);
 }

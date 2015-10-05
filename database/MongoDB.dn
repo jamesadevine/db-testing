@@ -1,6 +1,7 @@
 uses data.String;
 
-component provides MongoDB requires io.Output out, data.json.JSONParser parser, database.BSON bson, net.TCPSocket client, data.IntUtil iu, data.StringUtil su, util.RandomInt ri, database.ByteUtil bu, time.Calendar cal, time.DateUtil du{
+
+component provides MongoDB requires io.Output out, data.json.JSONParser parser, database.BSON bson, net.TCPSocket client, data.IntUtil iu, data.StringUtil su, util.RandomInt ri, database.ByteUtil bu, time.Calendar cal, time.DateUtil du, database.UUID uuid{
 
   char HOSTIP[] = "";
 	int HOSTPORT = 0;
@@ -10,18 +11,7 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
     HOSTIP = ip;
     HOSTPORT = port;
 
-    //generate our seed for MongoDB connections.
-    //you should never need more than one MongoDB instance to talk to the same
-    //database...
-
-    int rand_seed = 0;
-
-    String explodedIP[] = su.explode(ip,".");
-
-    for(int i = 0; i < explodedIP.arrayLength; i++)
-      rand_seed += iu.intFromString(explodedIP[i].string);
-
-    rand_seed += port;
+    int rand_seed = du.toMilliseconds(cal.getTime());
 
     ri.setSeed(rand_seed);
 
@@ -43,138 +33,144 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
 
   void MongoDB:insert(char collection[], JSONElement jsonQuery[]){
 
-    out.println("$(iu.intToString(jsonQuery.arrayLength))");
-
     if(jsonQuery.arrayLength == 0)
       throw new Exception("An empty array is not a valid query.");
 
-    BSONDocument queries[] = bson.serialise(jsonQuery[0]);
+    BSONDocument queries[];
 
-    for(int i = 1; i < jsonQuery.arrayLength; i++){
+    collection = new char[](collection,0);
 
-      BSONDocument doc = bson.serialise(jsonQuery[i]);
+    for(int i = 0; i < jsonQuery.arrayLength; i++){
+
+      JSONElement temp = jsonQuery[i];//insertID(jsonQuery[i]);
+
+      BSONDocument doc = bson.serialise(temp);
+
+      byte bytes[] = doc.value;
+
+      for(int j = 0; j < bytes.arrayLength; j++){
+        char charValue = bytes[j];
+  			int intValue = bytes[j];
+        out.println("$(iu.intToString(j+1))  \"$(charValue), $(iu.intToString(intValue))\"");
+      }
 
       queries = new BSONDocument[](queries, doc);
     }
 
-    /*
-      start bson to diagnose issues
-
-      byte testPacket[] = new byte[](bu.toLittleEndian(22));
-      testPacket = new byte[](testPacket, 2);
-      testPacket = new byte[](testPacket, new char[]("hello", BSON_NULL_TERMINATOR));
-      testPacket = new byte[](testPacket, bu.toLittleEndian(6));
-      testPacket = new byte[](testPacket, new char[]("world", BSON_NULL_TERMINATOR));
-      testPacket = new byte[](testPacket, 0);
-
-      for(int i = 0; i < testPacket.arrayLength; i++){
-        char c = testPacket[i];
-        out.println("Test Packet|| character : $(c) integer: $(iu.intToString(testPacket[i]))\n");
-      }
-
-      BSONDocument bsonTesting = bson.serialise(jsonQuery[0]);
-
-      for(int i = 0; i < bsonTesting.value.arrayLength; i++){
-        char c = bsonTesting.value[i];
-        out.println("BSONTesting -- LENGTH: $(iu.intToString(bsonTesting.value.arrayLength))|| character : $(c) integer: $(iu.intToString(bsonTesting.value[i]))\n");
-      }
-
-      MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + testPacket.arrayLength + 4 + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_INSERT);
-
-      MongoInsert ins = new MongoInsert(mh, 0, collection, bsonTesting);
-
-      send(serialiseMongoHeader(ins.header), serialiseMongoInsert(ins));
-    */
-
     //iterate queries, we write to the socket one at a time as per the spec!
     for(int i = 0; i < queries.arrayLength; i++){
 
+      out.println("$(iu.intToString(MONGO_HEADER_SIZE + queries[i].value.arrayLength + 4 + collection.arrayLength))");
+
       MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + queries[i].value.arrayLength + 4 + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_INSERT);
 
-      MongoInsert ins = new MongoInsert(mh, 0, collection, queries[i]);
+      MongoInsert ins = new MongoInsert(0, collection, queries[i]);
 
+      connect();
       send(serialiseMongoHeader(mh), serialiseMongoInsert(ins));
+      disconnect();
     }
   }
 
-  JSONElement MongoDB:find(char collection[], JSONElement jsonQuery, int32 numberToReturn){
+  JSONElement[] MongoDB:find(char collection[], JSONElement jsonQuery, int32 numberToReturn){
+
+    collection = new char[](collection,0);
 
     BSONDocument bsonQuery = bson.serialise(jsonQuery);
 
     MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + bsonQuery.value.arrayLength + 12 + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_QUERY);
 
-    MongoQuery query = new MongoQuery(mh, 0, collection, 0, numberToReturn, bsonQuery);
+    MongoQuery query = new MongoQuery(0, collection, 0, numberToReturn, bsonQuery);
+
+    connect();
 
     send(serialiseMongoHeader(mh), serialiseMongoQuery(query));
 
     byte received[] = receive();
 
-    return jsonQuery;
+    disconnect();
+
+    MongoReply responses = toMongoReply(received);
+
+    JSONElement jsonResponses[];
+
+    for(int i = 0; i < responses.documents.arrayLength; i++)
+      jsonResponses = new JSONElement[](jsonResponses, bson.deserialise(responses.documents[i]));
+
+    return jsonResponses;
   }
 
-  JSONElement MongoDB:findWithModifier(char collection[], JSONElement jsonQuery, JSONElement modifier, int32 numberToReturn){
+  JSONElement[] MongoDB:findWithModifier(char collection[], JSONElement jsonQuery, JSONElement modifier, int32 numberToReturn){
+
+    collection = new char[](collection,0);
 
     BSONDocument bsonQuery = bson.serialise(jsonQuery);
     BSONDocument bsonModifier = bson.serialise(modifier);
 
     MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + bsonQuery.value.arrayLength + bsonModifier.value.arrayLength + 12 + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_QUERY);
 
-    MongoQueryRF queryRF = new MongoQueryRF(mh, 0, collection, 0, numberToReturn, bsonQuery, bsonModifier);
+    MongoQueryRF queryRF = new MongoQueryRF(0, collection, 0, numberToReturn, bsonQuery, bsonModifier);
+
+    connect();
 
     send(serialiseMongoHeader(mh), serialiseMongoQueryRF(queryRF));
 
     byte received[] = receive();
 
-    return jsonQuery;
+    disconnect();
+
+    MongoReply responses = toMongoReply(received);
+
+    JSONElement jsonResponses[];
+
+    for(int i = 0; i < responses.documents.arrayLength; i++)
+      jsonResponses = new JSONElement[](jsonResponses, bson.deserialise(responses.documents[i]));
+
+    return jsonResponses;
   }
 
-  JSONElement MongoDB:update(char collection[], JSONElement jsonQuery, JSONElement updateObject){
+  void MongoDB:update(char collection[], JSONElement jsonQuery, JSONElement updateObject){
+
+    collection = new char[](collection,0);
 
     BSONDocument selector = bson.serialise(jsonQuery);
     BSONDocument bsonUpdate = bson.serialise(updateObject);
 
     MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + selector.value.arrayLength + bsonUpdate.value.arrayLength + 8 + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_UPDATE);
 
-    MongoUpdate update = new MongoUpdate(mh, 0, collection, 0, selector, bsonUpdate);
+    MongoUpdate update = new MongoUpdate(0, collection, 0, selector, bsonUpdate);
+
+    connect();
 
     send(serialiseMongoHeader(mh),serialiseMongoUpdate(update));
 
-    byte received[] = receive();
-
-    return jsonQuery;
+    disconnect();
   }
 
-  JSONElement MongoDB:delete(char collection[], JSONElement jsonQuery){
+  void MongoDB:delete(char collection[], JSONElement jsonQuery){
+
+    collection = new char[](collection,0);
 
     BSONDocument selector = bson.serialise(jsonQuery);
 
     MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + selector.value.arrayLength + 8 + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_DELETE);
 
-    MongoDelete delete = new MongoDelete(mh, 0, collection, 0, selector);
+    MongoDelete delete = new MongoDelete(0, collection, 0, selector);
+
+    connect();
 
     send(serialiseMongoHeader(mh), serialiseMongoDelete(delete));
 
-    byte received[] = receive();
-
-    return jsonQuery;
+    disconnect();
   }
 
   byte[] serialiseMongoHeader(MongoHeader mh){
 
-    byte serialised[];
-
-    serialised = bu.toLittleEndian(mh.messageLength);
+    byte serialised[] = bu.toLittleEndian(mh.messageLength);
 
     serialised = new byte[](serialised, bu.toLittleEndian(mh.requestID));
-
     serialised = new byte[](serialised, bu.toLittleEndian(mh.responseTo));
-
     serialised = new byte[](serialised, bu.toLittleEndian(mh.opCode));
-
-    /*for(int i = 0; i < serialised.arrayLength; i++){
-      char c = serialised[i];
-      out.println("HEADER character : $(c) integer: $(iu.intToString(serialised[i]))\n");
-    }*/
 
     return serialised;
   }
@@ -192,6 +188,7 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
   byte[] serialiseMongoQuery(MongoQuery query){
 
     byte serialised[] = bu.toLittleEndian(query.flags);
+
     serialised = new byte[](serialised, new byte[](query.fullCollectionName));
     serialised = new byte[](serialised, bu.toLittleEndian(query.numberToSkip));
     serialised = new byte[](serialised, bu.toLittleEndian(query.numberToReturn));
@@ -203,6 +200,7 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
   byte[] serialiseMongoQueryRF(MongoQueryRF queryRF){
 
     byte serialised[] = bu.toLittleEndian(queryRF.flags);
+
     serialised = new byte[](serialised, new byte[](queryRF.fullCollectionName));
     serialised = new byte[](serialised, bu.toLittleEndian(queryRF.numberToSkip));
     serialised = new byte[](serialised, bu.toLittleEndian(queryRF.numberToReturn));
@@ -234,36 +232,70 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
   }
 
   void send(byte header[], byte content[]){
-    connect();
     client.send(header);
     client.send(content);
-    disconnect();
   }
 
   byte[] receive(){
 
     byte received[];
 
-    byte buf[];
+    //the first four bytes contain message length
+    received = client.recv(4);
 
-    connect();
+    int32 messageLength = bu.toInteger(bu.reverse(received));
 
-    /*int previous = du.toMilliseconds(cal.getTime());
-
-    int current = du.toMilliseconds(cal.getTime());*/
-
-    while ((buf = client.recv(1)).arrayLength > 0){
-
-      /*received = new byte[](received, buf);
-
-      if(current - previous > MONGO_TIMEOUT_VALUE)
-        throw new Error("Timeout whilst waiting for a response");*/
-
-    }
-
-    disconnect();
+    //receive our data...
+    while ((received = new byte[](received,client.recv(1))).arrayLength < messageLength);
 
     return received;
+  }
+
+  MongoReply toMongoReply(byte data[]){
+    /*
+      I acknowledge this could be done in a few lines...
+      However this would be bad for readability, and understanding.
+
+      This structure will always be the same - no matter the response.
+
+      Mongo also communicates in little endian, dana does not, hence the conversions...
+    */
+
+    int32 messageLength = bu.toInteger(bu.reverse(su.subString(data,0,4)));
+    int32 requestID = bu.toInteger(bu.reverse(su.subString(data,4,4)));
+    int32 responseTo = bu.toInteger(bu.reverse(su.subString(data,8,4)));
+    int32 opCode = bu.toInteger(bu.reverse(su.subString(data,12,4)));
+
+    MongoHeader mh = new MongoHeader(messageLength,requestID,responseTo,opCode);
+
+    int32 responseFlags = bu.toInteger(bu.reverse(su.subString(data,16,4)));
+    int64 cursorID = bu.toInteger(bu.reverse(su.subString(data,20,8)));
+    int32 startingFrom = bu.toInteger(bu.reverse(su.subString(data,28,4)));
+    int32 numberReturned = bu.toInteger(bu.reverse(su.subString(data,32,4)));
+
+    BSONDocument bsonDocs[] = bson.parse(su.subString(data,36, data.arrayLength - 36));
+
+    MongoReply reply = new MongoReply(mh, responseFlags, cursorID, startingFrom, numberReturned, bsonDocs);
+
+    return reply;
+  }
+
+  JSONElement insertID(JSONElement element){
+
+    JSONElement newElement = element;
+
+    if(element.type != JSON_ELEMENT_OBJECT){
+      throw new Exception("Not a valid mongo object structure, JSON must be an object");
+    }
+
+    if(parser.getValue(element,"_id") == null){
+      JSONElement _idObject = new JSONElement(JSON_ELEMENT_STRING, "_id", uuid.generate(32));
+      JSONElement newChildren[] = new JSONElement[](_idObject,element.children);
+
+      newElement = new JSONElement(element.type, element.name, element.value, newChildren);
+    }
+
+    return newElement;
   }
 
 }
