@@ -1,4 +1,4 @@
-component provides ByteUtil requires io.Output out{
+component provides ByteUtil requires io.Output out, data.IntUtil iu{
 
   byte[] ByteUtil:reverse(byte bytes[]){
 
@@ -10,14 +10,60 @@ component provides ByteUtil requires io.Output out{
     return reversed;
   }
 
-  byte[] ByteUtil:toLittleEndian(int value){
-    int32 formatInt32 = value;
+  char[] ByteUtil:toHexString(byte bytes[]){
+    char hexString[] = "";
 
-    byte b[] = dana.getByteArrayOf(formatInt32);
+    for(int i = 0; i < bytes.arrayLength; i++){
+      char upperChar = (bytes[i] & 0xF0) >> 4;
+      char lowerChar = bytes[i] & 0x0F;
 
-    b = reverse(b);
+      //ascii offsets
+      if(upperChar < 10)
+        upperChar += 48;
+      else
+        upperChar += 87;
 
-    return b;
+      //ascii offsets
+      if(lowerChar < 10)
+        lowerChar += 48;
+      else
+        lowerChar += 87;
+
+
+      hexString = new char[](hexString,upperChar,lowerChar);
+    }
+
+    return hexString;
+  }
+
+	byte[] ByteUtil:fromHexString(char hexString[]){
+		byte byteArray[];
+
+    if(hexString.arrayLength % 2 != 0)
+      throw new Exception("A hex string must be of an even length.");
+
+		for(int i = 0; i < hexString.arrayLength; i += 2){
+			char upperByte = hexString[i];
+			char lowerByte = hexString[i+1];
+
+      //ascii offsets
+			if(upperByte < 58)
+        upperByte -= 48;
+      else
+        upperByte -= 87;
+
+      //ascii offsets
+      if(lowerByte < 58)
+        lowerByte -= 48;
+      else
+        lowerByte -= 87;
+
+			byte combined = (upperByte << 4) | lowerByte;
+
+			byteArray = new char[](byteArray,combined);
+		}
+
+    return byteArray;
   }
 
 }

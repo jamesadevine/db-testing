@@ -1,25 +1,154 @@
-component provides App requires io.Output out, data.IntUtil iu, database.MongoDB, data.json.JSONParser parser, database.BSON bsonSerialiser{
+component provides App requires io.Output out, data.IntUtil iu, database.MongoDB, data.json.JSONParser parser, database.BSON bsonSerialiser, database.UUID uuid, time.Timer time, database.ByteUtil bu{
+
+	char[] toString(JSONElement element, int depth){
+
+		char content[] = "\n";
+
+		char printDepth[] = "";
+
+		for(int i = 0; i < depth; i++)
+		 	printDepth = new char[](printDepth, "\t");
+
+		if(element.type == JSON_ELEMENT_OBJECT){
+
+			if(element.name.arrayLength > 0)
+				content = new char[](content,printDepth, element.name, " : ", "{");
+			else
+				content = new char[](content,printDepth, "{");
+
+			for(int i = 0; i < element.children.arrayLength; i++)
+				content = new char[](content, toString(element.children[i], depth + 1));
+
+			content = new char[](content,printDepth,"}");
+		}
+
+		if(element.type == JSON_ELEMENT_STRING)
+			content = new char[](content, printDepth, element.name, " : ", "\"", element.value,"\"");
+
+		if(element.type == JSON_ELEMENT_NUMBER || element.type == JSON_ELEMENT_BOOLEAN)
+			content = new char[](content, printDepth, element.name, " : ", element.value);
+
+		if(element.type == JSON_ELEMENT_ARRAY){
+
+			if(element.name.arrayLength > 0)
+				content = new char[](content, printDepth, element.name, " : ", "[");
+			else
+				content = new char[](content, printDepth, "[");
+
+
+			for(int i = 0; i < element.children.arrayLength; i++)
+				content = new char[](content, toString(element.children[i], depth + 1));
+
+			content = new char[](content, printDepth,"]");
+		}
+
+		content = new char[](content,"\n");
+
+		return content;
+	}
+
+	JSONElement getByName(JSONElement element, char name[]){
+
+		out.println(new char[]("\"",element.name,"\"  \"",name,"\""));
+
+		for(int i = 0; i < element.name.arrayLength; i++){
+			out.println(iu.intToString(element.name[i]));
+		}
+
+		if(element.name == name){
+			out.println("equals");
+
+			return element;
+		}
+
+		if(element.type == JSON_ELEMENT_OBJECT || element.type == JSON_ELEMENT_ARRAY){
+
+			JSONElement found;
+
+			for(int i = 0; i < element.children.arrayLength; i++)
+				if((found = getByName(element.children[i],name)) != null)
+					return found;
+		}
+
+		return null;
+	}
 
 	int App:main(AppParam params[]) {
 
-    JSONElement element = parser.parseDocument("{\"test\":33, \"arrayTest\":[{\"innerObjectTest\":43}]}");
-    BSONDocument bson = bsonSerialiser.serialise(element);
+		out.println("$(uuid.generate())");
 
-    byte bytes[] = bson.value;
+		out.println(bu.toHexString(new byte[](255,0,128)));
 
-    for(int i = 0; i < bson.value.arrayLength; i++){
-      char charValue = bson.value[i];
-			int intValue = bson.value[i];
-      out.println("\"$(charValue), $(iu.intToString(intValue))\"");
+		byte bytes[] = bu.fromHexString(bu.toHexString(new byte[](255,0,128)));
+
+		for(int i = 0; i < bytes.arrayLength; i++)
+			out.println(iu.intToString(bytes[i]));
+
+		/*int test = 2000;
+
+		byte bytes[] = dana.getByteArrayOf(test);
+
+		for(int j = 0; j < bytes.arrayLength; j++){
+      char charValue = bytes[j];
+      int intValue = bytes[j];
+      out.println("REC $(iu.intToString(j+1))  \"$(charValue), $(iu.intToString(intValue))\"");
     }
+
+		int result = bu.toInteger(bytes);
+
+		byte resultBytes[] = dana.getByteArrayOf(result);
+
+		for(int j = 0; j < resultBytes.arrayLength; j++){
+      char charValue = resultBytes[j];
+      int intValue = resultBytes[j];
+      out.println("REC $(iu.intToString(j+1))  \"$(charValue), $(iu.intToString(intValue))\"");
+    }
+
+		out.println("$(iu.intToString(result)) || $(iu.intToString(bytes.arrayLength))");
+
+
+
+    JSONElement element = parser.parseDocument("{\"test\":33, \"works\":\"true\", \"arrayTest\":[{\"innerObjectTest\":43}]}");
 
     MongoDB mongo = new MongoDB("127.0.0.1",27017);
 
     JSONElement elements[] = element;
 
-    JSONElement find = parser.parseDocument("{\"test\":33, \"arrayTest\":[{\"innerObjectTest\":43}]}");
+    //JSONElement find = parser.parseDocument("{\"test\":33, \"arrayTest\":[{\"innerObjectTest\":43}]}");
 
-    mongo.insert("db.testing",find);
+
+		mongo.insert("danasds.testing", elements);
+
+		JSONElement find = parser.parseDocument("{\"test\": 33}");
+		JSONElement update = parser.parseDocument("{\"test\": 44}");
+
+		//JSONElement find = parser.parseDocument("{\"hello\": \"world\"}");
+
+		mongo.update("danasds.testing",find, update);
+
+    JSONElement results[] = mongo.find("danasds.testing",find,2);
+
+		JSONElement _id;
+
+		for(int i = 0; i < results.arrayLength; i++){
+			out.println(toString(results[i], 0));
+
+		 	_id = parser.getValue(results[i],"_id");
+
+		}
+
+		JSONElement find2 = parser.parseDocument(new char[]("{\"_id\":\"",_id.value,"\"}"));
+
+		JSONElement results2[] = mongo.find("danasds.testing",find2,0);
+
+		for(int i = 0; i < results2.arrayLength; i++){
+			out.println(toString(results2[i], 0));
+		}*/
+
+		/*while(true){
+			time.sleep(100);
+		}*/
+
 
 		return 0;
 	}
