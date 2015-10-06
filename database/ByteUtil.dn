@@ -10,56 +10,60 @@ component provides ByteUtil requires io.Output out, data.IntUtil iu{
     return reversed;
   }
 
-  /*
-    these two functions could be combined into a single function...
-
-    It could:
-
-    * accept an integer
-    * turn to bytes
-    * return the new integer using toInteger? :)
-  */
-  byte[] ByteUtil:toLittleEndian(int value){
-    int32 formatInt32 = value;
-
-    byte b[] = dana.getByteArrayOf(formatInt32);
-
-    b = reverse(b);
-
-    return b;
-  }
-
-  byte[] ByteUtil:toBigEndian(int value){
-    int32 formatInt32 = value;
-
-    byte b[] = dana.getByteArrayOf(formatInt32);
-
-    b = reverse(b);
-
-    return b;
-  }
-
-
-
-  int ByteUtil:toInteger(byte bytes[]){
-
-    int returnVal = 0;
-
-    int shift = bytes.arrayLength-1;
+  char[] ByteUtil:toHexString(byte bytes[]){
+    char hexString[] = "";
 
     for(int i = 0; i < bytes.arrayLength; i++){
+      char upperChar = (bytes[i] & 0xF0) >> 4;
+      char lowerChar = bytes[i] & 0x0F;
 
-      int temp = bytes[i];
+      //ascii offsets
+      if(upperChar < 10)
+        upperChar += 48;
+      else
+        upperChar += 87;
 
-      temp <<= (8*shift);
+      //ascii offsets
+      if(lowerChar < 10)
+        lowerChar += 48;
+      else
+        lowerChar += 87;
 
-      returnVal |=  temp;
 
-      shift--;
-      //out.println("BYTE: $(iu.intToString(bytes[i])) returnVal: $(iu.intToString(returnVal)) shift: $(iu.intToString(shift))");
+      hexString = new char[](hexString,upperChar,lowerChar);
     }
 
-    return returnVal;
+    return hexString;
+  }
+
+	byte[] ByteUtil:fromHexString(char hexString[]){
+		byte byteArray[];
+
+    if(hexString.arrayLength % 2 != 0)
+      throw new Exception("A hex string must be of an even length.");
+
+		for(int i = 0; i < hexString.arrayLength; i += 2){
+			char upperByte = hexString[i];
+			char lowerByte = hexString[i+1];
+
+      //ascii offsets
+			if(upperByte < 58)
+        upperByte -= 48;
+      else
+        upperByte -= 87;
+
+      //ascii offsets
+      if(lowerByte < 58)
+        lowerByte -= 48;
+      else
+        lowerByte -= 87;
+
+			byte combined = (upperByte << 4) | lowerByte;
+
+			byteArray = new char[](byteArray,combined);
+		}
+
+    return byteArray;
   }
 
 }

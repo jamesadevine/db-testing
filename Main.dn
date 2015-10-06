@@ -1,6 +1,8 @@
 component provides App requires io.Output out, data.IntUtil iu, database.MongoDB, data.json.JSONParser parser, database.BSON bsonSerialiser, database.UUID uuid, time.Timer time, database.ByteUtil bu{
 
-	void printJSON(JSONElement element, int depth){
+	char[] toString(JSONElement element, int depth){
+
+		char content[] = "\n";
 
 		char printDepth[] = "";
 
@@ -10,39 +12,77 @@ component provides App requires io.Output out, data.IntUtil iu, database.MongoDB
 		if(element.type == JSON_ELEMENT_OBJECT){
 
 			if(element.name.arrayLength > 0)
-				out.println(new char[](printDepth, element.name, " : ", "{"));
+				content = new char[](content,printDepth, element.name, " : ", "{");
 			else
-				out.println(new char[](printDepth, "{"));
+				content = new char[](content,printDepth, "{");
 
 			for(int i = 0; i < element.children.arrayLength; i++)
-				printJSON(element.children[i], depth + 1);
+				content = new char[](content, toString(element.children[i], depth + 1));
 
-			out.println(new char[](printDepth,"}"));
+			content = new char[](content,printDepth,"}");
 		}
 
 		if(element.type == JSON_ELEMENT_STRING)
-			out.println(new char[](printDepth, element.name, " : ", "\"", element.value,"\""));
+			content = new char[](content, printDepth, element.name, " : ", "\"", element.value,"\"");
 
 		if(element.type == JSON_ELEMENT_NUMBER || element.type == JSON_ELEMENT_BOOLEAN)
-			out.println(new char[](printDepth, element.name, " : ", element.value));
+			content = new char[](content, printDepth, element.name, " : ", element.value);
 
 		if(element.type == JSON_ELEMENT_ARRAY){
 
 			if(element.name.arrayLength > 0)
-				out.println(new char[](printDepth, element.name, " : ", "["));
+				content = new char[](content, printDepth, element.name, " : ", "[");
 			else
-				out.println(new char[](printDepth, "["));
+				content = new char[](content, printDepth, "[");
+
 
 			for(int i = 0; i < element.children.arrayLength; i++)
-				printJSON(element.children[i], depth + 1);
+				content = new char[](content, toString(element.children[i], depth + 1));
 
-			out.println(new char[](printDepth,"]"));
+			content = new char[](content, printDepth,"]");
 		}
+
+		content = new char[](content,"\n");
+
+		return content;
+	}
+
+	JSONElement getByName(JSONElement element, char name[]){
+
+		out.println(new char[]("\"",element.name,"\"  \"",name,"\""));
+
+		for(int i = 0; i < element.name.arrayLength; i++){
+			out.println(iu.intToString(element.name[i]));
+		}
+
+		if(element.name == name){
+			out.println("equals");
+
+			return element;
+		}
+
+		if(element.type == JSON_ELEMENT_OBJECT || element.type == JSON_ELEMENT_ARRAY){
+
+			JSONElement found;
+
+			for(int i = 0; i < element.children.arrayLength; i++)
+				if((found = getByName(element.children[i],name)) != null)
+					return found;
+		}
+
+		return null;
 	}
 
 	int App:main(AppParam params[]) {
 
-		out.println("$(uuid.generate(32))");
+		out.println("$(uuid.generate())");
+
+		out.println(bu.toHexString(new byte[](255,0,128)));
+
+		byte bytes[] = bu.fromHexString(bu.toHexString(new byte[](255,0,128)));
+
+		for(int i = 0; i < bytes.arrayLength; i++)
+			out.println(iu.intToString(bytes[i]));
 
 		/*int test = 2000;
 
@@ -64,7 +104,7 @@ component provides App requires io.Output out, data.IntUtil iu, database.MongoDB
       out.println("REC $(iu.intToString(j+1))  \"$(charValue), $(iu.intToString(intValue))\"");
     }
 
-		out.println("$(iu.intToString(result)) || $(iu.intToString(bytes.arrayLength))");*/
+		out.println("$(iu.intToString(result)) || $(iu.intToString(bytes.arrayLength))");
 
 
 
@@ -85,14 +125,25 @@ component provides App requires io.Output out, data.IntUtil iu, database.MongoDB
 		//JSONElement find = parser.parseDocument("{\"hello\": \"world\"}");
 
 		mongo.update("danasds.testing",find, update);
-		/*
+
     JSONElement results[] = mongo.find("danasds.testing",find,2);
 
+		JSONElement _id;
+
 		for(int i = 0; i < results.arrayLength; i++){
-			printJSON(results[i], 0);
+			out.println(toString(results[i], 0));
+
+		 	_id = parser.getValue(results[i],"_id");
+
 		}
 
-		*/
+		JSONElement find2 = parser.parseDocument(new char[]("{\"_id\":\"",_id.value,"\"}"));
+
+		JSONElement results2[] = mongo.find("danasds.testing",find2,0);
+
+		for(int i = 0; i < results2.arrayLength; i++){
+			out.println(toString(results2[i], 0));
+		}*/
 
 		/*while(true){
 			time.sleep(100);
