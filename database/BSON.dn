@@ -22,6 +22,13 @@ const char BSON_NULL_TERMINATOR = 0x00;
 
 component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil su, database.ByteUtil bu{
 
+  /**
+    BSON:serialise
+
+    @param json the json document to serialise into BSON format.
+
+  **/
+
   BSONDocument BSON:serialise(JSONElement json){
 
     BSONDocument bsonFromJson = digestJSONElement(json);
@@ -32,16 +39,25 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
     //append document terminator
     bsonFromJson.value = new byte[](bsonFromJson.value, BSON_NULL_TERMINATOR);
 
-    out.println(" TOTAL LENGTH: $(iu.intToString(bsonFromJson.value.arrayLength))");
-
-
     return bsonFromJson;
   }
 
+  /**
+    BSON:deserialise
+
+    @param bson the bson document to serialise into JSON format.
+
+  **/
   JSONElement BSON:deserialise(BSONDocument bson){
     return new JSONElement(JSON_ELEMENT_OBJECT, "", "", digestBSONDocument(bson));
   }
 
+  /**
+    BSON:parse
+
+    @param bsonDocuments a byte array of documents to parse into separate BSONDocuments
+
+  **/
   BSONDocument[] BSON:parse(byte bsonDocuments[]){
 
     BSONDocument docs[];
@@ -139,8 +155,6 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
 
     if(element.name == "_id"){
 
-      out.println("WE ARE IN ID");
-
       //add our type
       bson.value = new byte[](bson.value, BSON_OBJECT_ID);
 
@@ -157,9 +171,6 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
     }
 
     if(element.type == JSON_ELEMENT_OBJECT){
-
-      out.println("OBJECT!!!");
-
       /*
         if this element doesn't have a name - we can presume we are digesting
         for the first time.
@@ -170,7 +181,6 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
       */
 
       if(element.name.arrayLength > 0){
-        out.println("NAME: $(element.name)");
         //add our type
         bson.value = new byte[](bson.value, BSON_EMBEDDED_DOCUMENT);
 
@@ -186,11 +196,7 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
       */
       BSONDocument children = new BSONDocument("");
 
-      out.println("OBJECT LENGTH $(iu.intToString(element.children.arrayLength))");
-
       for(int i = 0; i < element.children.arrayLength; i++){
-
-        out.println("$(iu.intToString(i))-- OBJECT CHILD:$(iu.intToString(element.children[i].type)) || $(element.children[i].name) || $(element.children[i].value)");
 
         BSONDocument newChild = digestJSONElement(element.children[i]);
 
@@ -251,7 +257,7 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
     }
 
     if(element.type == JSON_ELEMENT_ARRAY){
-      out.println("ARRAY");
+
       bson.value = new byte[](bson.value, BSON_ARRAY);
 
       if(element.name.arrayLength == 0){
@@ -269,11 +275,7 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
       */
       BSONDocument children = new BSONDocument("");
 
-      out.println("ARRAY LENGTH $(iu.intToString(element.children.arrayLength))");
-
       for(int i = 0; i < element.children.arrayLength; i++){
-
-        out.println("ARRAY CHILD:$(iu.intToString(element.children[i].type)) || $(element.children[i].name) || $(element.children[i].value)");
 
         JSONElement newParent = new JSONElement(element.children[i].type, iu.intToString(i), element.children[i].value, element.children[i].children);
 
@@ -325,8 +327,6 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
 
   JSONElement[] digestBSONDocument(BSONDocument document){
 
-    out.println(iu.intToString(document.value.arrayLength));
-
     JSONElement elements[];
 
     byte content[] = document.value;
@@ -350,11 +350,7 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
 
       count += name.arrayLength + 1;
 
-      out.println("LOOP $(name) type: $(iu.intToString(type))");
-
       if(type == BSON_EMBEDDED_DOCUMENT){
-
-        out.println("DOCUMENT $(name)");
 
         int32 objectSize;
 
@@ -383,8 +379,6 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
           count++;
         }
 
-        out.println("UTF8 $(name) $(value)");
-
         elements = new JSONElement[](elements, new JSONElement(JSON_ELEMENT_STRING, name, value, new JSONElement()));
       }
 
@@ -401,8 +395,6 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
           count++;
         }
 
-        out.println("ID $(name) $(value)");
-
         elements = new JSONElement[](elements, new JSONElement(JSON_ELEMENT_STRING, name, bu.toHexString(value), new JSONElement()));
       }
 
@@ -414,8 +406,6 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
 
         //we've digested the integer
         count += 4;
-
-        out.println("int32 $(name) $(iu.intToString(value))");
 
         elements = new JSONElement[](elements, new JSONElement(JSON_ELEMENT_NUMBER, name, iu.intToString(value), new JSONElement()));
       }
@@ -433,8 +423,6 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
         else
           value = "false";
 
-        out.println("BOOL $(name) $(value)");
-
         elements = new JSONElement[](elements, new JSONElement(JSON_ELEMENT_BOOLEAN, name, iu.intToString(value), new JSONElement()));
       }
 
@@ -444,14 +432,7 @@ component provides BSON requires io.Output out, data.IntUtil iu, data.StringUtil
 
         dana.getByteArrayOf(arraySize) =[] bu.reverse(su.subString(content,count,4));
 
-        out.println("ARRAY $(name) Array Size: $(iu.intToString(arraySize))");
-
-
-
         JSONElement children[] = digestBSONDocument(new BSONDocument(su.subString(content,count,arraySize)));
-
-        for(int i = 0; i < children.arrayLength; i++)
-          out.println(new char[]("NAMES: ", children[i].name));
 
         elements = new JSONElement[](elements, new JSONElement(JSON_ELEMENT_ARRAY, name, "", children));
 

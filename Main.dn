@@ -49,17 +49,8 @@ component provides App requires io.Output out, data.IntUtil iu, database.MongoDB
 
 	JSONElement getByName(JSONElement element, char name[]){
 
-		out.println(new char[]("\"",element.name,"\"  \"",name,"\""));
-
-		for(int i = 0; i < element.name.arrayLength; i++){
-			out.println(iu.intToString(element.name[i]));
-		}
-
-		if(element.name == name){
-			out.println("equals");
-
+		if(element.name == name)
 			return element;
-		}
 
 		if(element.type == JSON_ELEMENT_OBJECT || element.type == JSON_ELEMENT_ARRAY){
 
@@ -83,28 +74,6 @@ component provides App requires io.Output out, data.IntUtil iu, database.MongoDB
 
 		for(int i = 0; i < bytes.arrayLength; i++)
 			out.println(iu.intToString(bytes[i]));
-
-		/*int test = 2000;
-
-		byte bytes[] = dana.getByteArrayOf(test);
-
-		for(int j = 0; j < bytes.arrayLength; j++){
-      char charValue = bytes[j];
-      int intValue = bytes[j];
-      out.println("REC $(iu.intToString(j+1))  \"$(charValue), $(iu.intToString(intValue))\"");
-    }
-
-		int result = bu.toInteger(bytes);
-
-		byte resultBytes[] = dana.getByteArrayOf(result);
-
-		for(int j = 0; j < resultBytes.arrayLength; j++){
-      char charValue = resultBytes[j];
-      int intValue = resultBytes[j];
-      out.println("REC $(iu.intToString(j+1))  \"$(charValue), $(iu.intToString(intValue))\"");
-    }
-
-		out.println("$(iu.intToString(result)) || $(iu.intToString(bytes.arrayLength))");
 
 
 
@@ -143,7 +112,7 @@ component provides App requires io.Output out, data.IntUtil iu, database.MongoDB
 
 		for(int i = 0; i < results2.arrayLength; i++){
 			out.println(toString(results2[i], 0));
-		}*/
+		}
 
 		/*while(true){
 			time.sleep(100);

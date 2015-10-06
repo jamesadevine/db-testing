@@ -1,5 +1,11 @@
 component provides ByteUtil requires io.Output out, data.IntUtil iu{
 
+  /**
+    ByteUtil:reverse
+
+    @param bytes an array of bytes to reverse
+
+  **/
   byte[] ByteUtil:reverse(byte bytes[]){
 
     byte reversed[] = new byte[bytes.arrayLength];
@@ -10,6 +16,12 @@ component provides ByteUtil requires io.Output out, data.IntUtil iu{
     return reversed;
   }
 
+  /**
+    ByteUtil:toHexString
+
+    @param bytes an array of bytes to transform into a hexidecimal string
+
+  **/
   char[] ByteUtil:toHexString(byte bytes[]){
     char hexString[] = "";
 
@@ -36,6 +48,12 @@ component provides ByteUtil requires io.Output out, data.IntUtil iu{
     return hexString;
   }
 
+  /**
+    ByteUtil:fromHexString
+
+    @param hexString an array of ascii hex characters to transpose back into a byte array
+
+  **/
 	byte[] ByteUtil:fromHexString(char hexString[]){
 		byte byteArray[];
 

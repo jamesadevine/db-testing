@@ -5,7 +5,28 @@ data BSONDocument{
 }
 
 interface BSON {
+
+  /**
+    BSON:serialise
+
+    @param json the json document to serialise into BSON format.
+
+  **/
   BSONDocument serialise(JSONElement json);
+
+  /**
+    BSON:deserialise
+
+    @param bson the bson document to serialise into JSON format.
+
+  **/
   JSONElement deserialise(BSONDocument bson);
+
+  /**
+    BSON:parse
+
+    @param bsonDocuments a byte array of documents to parse into separate BSONDocuments
+
+  **/
   BSONDocument[] parse(byte bsonDocuments[]);
 }

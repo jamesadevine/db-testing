@@ -217,6 +217,14 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
   char HOSTIP[] = "";
 	int HOSTPORT = 0;
 
+  /**
+    MongoDB:MongoDB (constructor)
+
+    @param ip a char array containing the address of the mongod instance you would
+           like to connect to.
+
+    @param port the integer value of the database instances' port.
+  **/
   MongoDB:MongoDB(char ip[], int port){
     //set our hostip and port for this instance.
     HOSTIP = ip;
@@ -242,39 +250,62 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
     client.disconnect();
   }
 
-  void MongoDB:insert(char collection[], JSONElement jsonQuery[]){
+  /**
+    MongoDB:insert
 
-    if(jsonQuery.arrayLength == 0)
+    @param collection the name of the collection you are specifically trying to target in MongoDB
+           e.g. danasds.testing
+
+    @param jsonDocuments the documents you would like to insert
+
+    @note if you insert into a collection that doesn't exist, mongo will create the collection.
+  **/
+  bool MongoDB:insert(char collection[], JSONElement jsonDocuments[]){
+
+    if(jsonDocuments.arrayLength == 0)
       throw new Exception("An empty array is not a valid query.");
 
-    BSONDocument queries[];
+    BSONDocument documents[];
 
     collection = new char[](collection,0);
 
-    for(int i = 0; i < jsonQuery.arrayLength; i++){
+    for(int i = 0; i < jsonDocuments.arrayLength; i++){
 
-      JSONElement temp = jsonQuery[i];
+      JSONElement temp = jsonDocuments[i];
 
       BSONDocument doc = bson.serialise(temp);
 
       byte bytes[] = doc.value;
 
-      queries = new BSONDocument[](queries, doc);
+      documents = new BSONDocument[](documents, doc);
     }
 
     //iterate queries, we write to the socket one at a time as per the spec!
-    for(int i = 0; i < queries.arrayLength; i++){
+    for(int i = 0; i < documents.arrayLength; i++){
 
-      MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + queries[i].value.arrayLength + MongoInsert.STATIC_INT_SIZE + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_INSERT);
+      MongoHeader mh = new MongoHeader(MONGO_HEADER_SIZE + documents[i].value.arrayLength + MongoInsert.STATIC_INT_SIZE + collection.arrayLength, ri.get(MONGO_MAX_RAND), 0, OP_INSERT);
 
-      MongoInsert ins = new MongoInsert(0, collection, queries[i]);
+      MongoInsert ins = new MongoInsert(0, collection, documents[i]);
 
       if(!connect()){ throw new Exception("Unable to connect to the database.") }
       send(serialiseMongoHeader(mh), serialiseMongoInsert(ins));
       disconnect();
     }
+
+    return true;
   }
 
+  /**
+    MongoDB:find
+
+    @param collection the name of the collection you are specifically trying to target in MongoDB
+           e.g. danasds.testing
+
+    @param jsonQuery the query to execute on the database
+
+    @param numberToReturn the number of documents to return, if you would like Mongo's default,
+           set to 0.
+  **/
   JSONElement[] MongoDB:find(char collection[], JSONElement jsonQuery, int32 numberToReturn){
 
     collection = new char[](collection,0);
@@ -303,6 +334,20 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
     return jsonResponses;
   }
 
+  /**
+    MongoDB:findWithModifier
+
+    @param collection the name of the collection you are specifically trying to target in MongoDB
+           e.g. danasds.testing
+
+    @param jsonQuery the query to execute on the database
+
+    @param modifier an object containing various modifiers that specify things like ordering.
+           For a full list visit: http://docs.mongodb.org/manual/reference/operator/query-modifier/
+
+    @param numberToReturn the number of documents to return, if you would like Mongo's default,
+           set to 0.
+  **/
   JSONElement[] MongoDB:findWithModifier(char collection[], JSONElement jsonQuery, JSONElement modifier, int32 numberToReturn){
 
     collection = new char[](collection,0);
@@ -332,7 +377,19 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
     return jsonResponses;
   }
 
-  void MongoDB:update(char collection[], JSONElement jsonQuery, JSONElement updateObject){
+  /**
+    MongoDB:findWithModifier
+
+    @param collection the name of the collection you are specifically trying to target in MongoDB
+           e.g. danasds.testing
+
+    @param jsonQuery the query to execute on the database
+
+    @param updateObject an object containing search criteria. It is common to use the _id field
+           returned by the database, or adding your own UUID to objects.
+
+  **/
+  bool MongoDB:update(char collection[], JSONElement jsonQuery, JSONElement updateObject){
 
     collection = new char[](collection,0);
 
@@ -348,9 +405,19 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
     send(serialiseMongoHeader(mh),serialiseMongoUpdate(update));
 
     disconnect();
+
+    return true;
   }
 
-  void MongoDB:delete(char collection[], JSONElement jsonQuery){
+  /**
+    MongoDB:delete
+
+    @param collection the name of the collection you are specifically trying to target in MongoDB
+           e.g. danasds.testing
+
+    @param jsonQuery the query to execute on the database
+  **/
+  bool MongoDB:delete(char collection[], JSONElement jsonQuery){
 
     collection = new char[](collection,0);
 
@@ -365,6 +432,8 @@ component provides MongoDB requires io.Output out, data.json.JSONParser parser, 
     send(serialiseMongoHeader(mh), serialiseMongoDelete(delete));
 
     disconnect();
+
+    return true;
   }
 
   byte[] toLittleEndian(int32 value){

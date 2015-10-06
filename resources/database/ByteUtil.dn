@@ -1,5 +1,26 @@
 interface ByteUtil{
+
+  /**
+    ByteUtil:reverse
+
+    @param bytes an array of bytes to reverse
+
+  **/
   byte[] reverse(byte bytes[]);
+
+  /**
+    ByteUtil:fromHexString
+
+    @param hexString an array of ascii hex characters to transpose back into a byte array
+
+  **/
   byte[] fromHexString(char hexString[]);
-  char[] ByteUtil:toHexString(byte bytes[]);
+
+  /**
+    ByteUtil:toHexString
+
+    @param bytes an array of bytes to transform into a hexidecimal string
+
+  **/
+  char[] toHexString(byte bytes[]);
 }

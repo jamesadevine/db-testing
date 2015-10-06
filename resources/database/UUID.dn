@@ -1,3 +1,15 @@
 interface UUID {
+
+  /*
+    UUID:generate
+
+    Generates a 36 character UUID, divided into chunks, using dashes as a
+    delimeter.
+
+    Chunks have the following lengths:
+
+    8-4-4-4-12
+
+  */
   char[] generate();
 }

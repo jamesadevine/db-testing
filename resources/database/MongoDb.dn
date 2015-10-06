@@ -1,10 +1,79 @@
 uses data.json.JSONParser;
 
 interface MongoDB {
+
+	/**
+    MongoDB:MongoDB (constructor)
+
+    @param ip a char array containing the address of the mongod instance you would
+           like to connect to.
+
+    @param port the integer value of the database instances' port.
+  **/
 	MongoDB(char ip[], int port);
-	void insert(char collection[], JSONElement jsonQuery[]);
+
+	/**
+    MongoDB:insert
+
+    @param collection the name of the collection you are specifically trying to target in MongoDB
+           e.g. danasds.testing
+
+    @param jsonDocuments the documents you would like to insert
+
+    @note if you insert into a collection that doesn't exist, mongo will create the collection.
+  **/
+	bool insert(char collection[], JSONElement jsonQuery[]);
+
+	/**
+    MongoDB:find
+
+    @param collection the name of the collection you are specifically trying to target in MongoDB
+           e.g. danasds.testing
+
+    @param jsonQuery the query to execute on the database
+
+    @param numberToReturn the number of documents to return, if you would like Mongo's default,
+           set to 0.
+  **/
 	JSONElement[] find(char collection[], JSONElement jsonQuery, int32 numberToReturn);
+
+	/**
+    MongoDB:findWithModifier
+
+    @param collection the name of the collection you are specifically trying to target in MongoDB
+           e.g. danasds.testing
+
+    @param jsonQuery the query to execute on the database
+
+    @param modifier an object containing various modifiers that specify things like ordering.
+           For a full list visit: http://docs.mongodb.org/manual/reference/operator/query-modifier/
+
+    @param numberToReturn the number of documents to return, if you would like Mongo's default,
+           set to 0.
+  **/
   JSONElement[] findWithModifier(char collection[], JSONElement jsonQuery, JSONElement modifier, int32 numberToReturn);
-	void update(char collection[], JSONElement jsonQuery, JSONElement update);
-	void delete(char collection[], JSONElement jsonQuery);
+
+	/**
+    MongoDB:findWithModifier
+
+    @param collection the name of the collection you are specifically trying to target in MongoDB
+           e.g. danasds.testing
+
+    @param jsonQuery the query to execute on the database
+
+    @param updateObject an object containing search criteria. It is common to use the _id field
+           returned by the database, or adding your own UUID to objects.
+
+  **/
+	bool update(char collection[], JSONElement jsonQuery, JSONElement update);
+
+	/**
+    MongoDB:delete
+
+    @param collection the name of the collection you are specifically trying to target in MongoDB
+           e.g. danasds.testing
+
+    @param jsonQuery the query to execute on the database
+  **/
+	bool delete(char collection[], JSONElement jsonQuery);
 }

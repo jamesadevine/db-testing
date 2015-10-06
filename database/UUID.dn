@@ -10,11 +10,20 @@ component provides UUID requires io.Output out, data.IntUtil iu, util.RandomInt,
     chunks are divided using dashes, and the chunks
     as of the 6/10/2015 have the following lengths:
   */
-  int UUID_CHUNK_LENGTHS = new int[](8, 4, 4, 4, 12);
+  int UUID_CHUNK_LENGTHS[] = new int[](8, 4, 4, 4, 12);
 
+  /*
+    UUID:generate
+
+    Generates a 36 character UUID, divided into chunks, using dashes as a
+    delimeter.
+
+    Chunks have the following lengths:
+
+    8-4-4-4-12
+
+  */
   char[] UUID:generate(){
-
-    int length = 32;
 
     char uuid[] = "";
 
@@ -39,14 +48,13 @@ component provides UUID requires io.Output out, data.IntUtil iu, util.RandomInt,
       }
 
       //append a dash to all chunks except the last.
-      if(j != UUID_CHUNK_LENGTHS.arrayLength -1);
+      if(j != UUID_CHUNK_LENGTHS.arrayLength - 1)
         uuid = new char[](uuid,"-");
     }
 
     return uuid;
   }
 
-  //should this be in int util? :)
   bool between(int value, int lower, int upper){
     if(value <= upper && value >=lower)
       return true;
