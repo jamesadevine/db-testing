@@ -1,4 +1,115 @@
-component provides App requires io.Output out, data.IntUtil iu, database.MongoDB, data.json.JSONParser parser, database.BSON bsonSerialiser, database.UUID uuid, time.Timer time, database.ByteUtil bu{
+component provides App requires io.Output out, data.IntUtil iu, database.MongoDB, data.json.JSONParser parser, database.BSON bsonSerialiser, database.UUID uuid, time.Timer time, database.ByteUtil bu, data.StringUtil su {
+
+	String[] remove(int indexes[], String elements[]){
+
+		if(indexes.arrayLength < 1 || elements.arrayLength < 1)
+			throw new Exception("Invalid input: Your arrays must contain 1 or more elements");
+
+		out.println("Number of elements: $(iu.intToString(elements.arrayLength - indexes.arrayLength)) old $(iu.intToString(elements.arrayLength))");
+
+		String newElements[] = new String[elements.arrayLength - indexes.arrayLength];
+
+		out.println("New Elements: $(iu.intToString(newElements.arrayLength))");
+
+		int newElementsCount = 0;
+
+		for(int elementCount = 0; elementCount < elements.arrayLength; elementCount++){
+			bool toBeRemoved = false;
+
+			for(int indexCount = 0; indexCount < indexes.arrayLength; indexCount++){
+				if(indexes[indexCount] == elementCount){
+					toBeRemoved = true;
+					break;
+				}
+			}
+
+			if(toBeRemoved == false){
+				out.println("Before: $(iu.intToString(newElementsCount)) $(iu.intToString(elementCount)) $(elements[elementCount].string)");
+				newElements[newElementsCount] = elements[elementCount];
+				newElementsCount++;
+				out.println("After: $(iu.intToString(newElementsCount)) $(iu.intToString(elementCount))");
+			}
+		}
+
+		return newElements;
+	}
+
+
+	JSONElement getValueByDot(String tokens[], JSONElement tree){
+
+		for(int i = 0; i < tokens.arrayLength; i++)
+			out.println(tokens[i].string);
+
+		/*if(tokens.arrayLength == 1)
+			if(tree.name == tokens[0].string)
+				return tree;
+			else
+				throw new Exception("Exception: item not found.\n\n $(tree.name) != $(tokens[0].string)");*/
+
+		char currentToken[] = tokens[0].string;
+
+		JSONElement result;
+
+		if(tree.type == JSON_ELEMENT_OBJECT){
+
+			int open;
+			int close;
+			int index;
+
+			//check if the user is giving us an arrayName with an index.
+			if((open = su.find(currentToken,"[")) > 0 && ((close = su.find(currentToken,"]"))  > 0)){
+				//we extract the index for the array
+
+				out.println(su.subString(currentToken, open + 1, close - open - 1));
+				index = iu.intFromString(su.subString(currentToken, open + 1, close - open - 1));
+				currentToken = su.subString(currentToken,0,open);
+			}
+
+			for(int i = 0; i < tree.children.arrayLength; i++)
+				if(tree.children[i].name == currentToken){
+
+					String newTokens[] = remove(new int[](0),tokens);
+
+					/*this is the case where we are not indexing an array
+					if(open == 0){
+
+
+
+					}else{
+
+
+
+						//recursively call the function, by getting the array, and then fetching the desired child item.
+
+					}*/
+
+					out.println("open $(iu.intToString(open)) closed $(iu.intToString(close)) index $(iu.intToString(index)) arrayLength $(iu.intToString(newTokens.arrayLength))");
+
+					if(newTokens.arrayLength > 1 && open == 0)
+						result = getValueByDot(newTokens, tree.children[i]);
+					else if(newTokens.arrayLength > 1 && open > 0)
+						result = getValueByDot(newTokens, tree.children[i].children[index]);
+					else if(newTokens.arrayLength == 1 && open == 0)
+						result = tree.children[i];
+					else if(newTokens.arrayLength == 1 && open > 0)
+						result = tree.children[i].children[index];
+					else
+						throw new Exception("Exception: item not found.\n\n $(tree.name) != $(tokens[0].string)");
+				}
+		}else{
+			throw new Exception("Exception: item not found.");
+		}
+
+		if(result == null){
+			out.println(currentToken);
+		}
+
+		return result;
+	}
+
+	JSONElement getValueWrapper(char dotNotation[], JSONElement tree){
+		return getValueByDot(su.explode(dotNotation,"."), tree);
+	}
 
 	char[] toString(JSONElement element, int depth){
 
@@ -66,20 +177,22 @@ component provides App requires io.Output out, data.IntUtil iu, database.MongoDB
 
 	int App:main(AppParam params[]) {
 
-		out.println("$(uuid.generate())");
+		/*out.println("$(uuid.generate())");
 
 		out.println(bu.toHexString(new byte[](255,0,128)));
 
 		byte bytes[] = bu.fromHexString(bu.toHexString(new byte[](255,0,128)));
 
 		for(int i = 0; i < bytes.arrayLength; i++)
-			out.println(iu.intToString(bytes[i]));
+			out.println(iu.intToString(bytes[i]));*/
 
 
 
-    JSONElement element = parser.parseDocument("{\"test\":33, \"works\":\"true\", \"arrayTest\":[{\"innerObjectTest\":43}]}");
+    JSONElement element = parser.parseDocument("{\"test\":33, \"works\":\"true\", \"arrayTest\":[{\"innerObjectTest\":43},[{\"innerObject2\":{\"array2\":[\"a\"]}}]]}");
 
-    MongoDB mongo = new MongoDB("127.0.0.1",27017);
+		out.println(toString(getValueWrapper("arrayTest[1].innerObject2.array2[0]",element),0));
+
+    /*MongoDB mongo = new MongoDB("127.0.0.1",27017);
 
     JSONElement elements[] = element;
 
